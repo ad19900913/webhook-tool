@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook回调工具</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔗 Webhook回调工具</h1>
+            <div class="header-right">
+                <div class="system-status" id="systemStatus">
+                    <div class="memory-info">
+                        <span class="memory-label">内存使用:</span>
+                        <span class="memory-value" id="memoryValue">-- MB</span>
+                        <span class="memory-warning" id="memoryWarning" style="display: none;">⚠️ 内存不足</span>
+                    </div>
+                    <div class="system-actions">
+                        <button id="clearAllLogsBtn" class="btn btn-small btn-warning" style="display: none;">清理所有日志</button>
+                    </div>
+                </div>
+                <button id="createBtn" class="btn btn-primary">创建新的Webhook</button>
+            </div>
+        </header>
+
+        <main class="main-layout">
+            <!-- 左侧Webhook列表 -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Webhook列表</h2>
+                    <button id="createBtn2" class="btn btn-small btn-primary">新建</button>
+                </div>
+                <div class="sidebar-content">
+                    <div id="webhookContainer">
+                        <!-- Webhook项目将在这里动态生成 -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 右侧日志展示区域 -->
+            <section class="content-area">
+                <div class="logs-section">
+                    <div class="logs-header">
+                        <h2>实时日志</h2>
+                        <div class="logs-controls">
+                            <select id="webhookFilter">
+                                <option value="">选择Webhook查看日志</option>
+                            </select>
+                            <select id="messageTypeFilter">
+                                <option value="all">所有类型</option>
+                            </select>
+                            <div class="search-controls">
+                                <input type="text" id="tenantIdSearch" placeholder="搜索 tenantId">
+                                <input type="text" id="uniqueIdSearch" placeholder="搜索 uniqueId">
+                                <button id="clearSearchBtn" class="btn btn-small btn-secondary">清空搜索</button>
+                            </div>
+                            <div class="type-stats" id="typeStats"></div>
+                            <button id="clearLogsBtn" class="btn btn-secondary">清空日志</button>
+                        </div>
+                    </div>
+                    <div id="logsContainer" class="logs-container">
+                        <div class="no-logs">请在左侧选择一个Webhook查看日志</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 创建/编辑Webhook模态框 -->
+    <div id="webhookModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">创建Webhook</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="webhookForm">
+                <div class="form-group">
+                    <label for="webhookName">名称:</label>
+                    <input type="text" id="webhookName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="pathType">路径类型:</label>
+                    <select id="pathType">
+                        <option value="auto">自动生成</option>
+                        <option value="custom">自定义路径</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="customPathGroup" style="display: none;">
+                    <label for="customPath">自定义路径:</label>
+                    <input type="text" id="customPath" placeholder="例如: my-webhook">
+                    <small>完整地址将是: /webhook/your-path</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="webhookDescription">描述:</label>
+                    <textarea id="webhookDescription" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="delayType">延时类型:</label>
+                    <select id="delayType">
+                        <option value="none">无延时</option>
+                        <option value="fixed">固定延时</option>
+                        <option value="random">随机延时</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="fixedDelayGroup" style="display: none;">
+                    <label for="delayValue">延时时间(毫秒):</label>
+                    <input type="number" id="delayValue" min="1" max="100000" step="1" value="1000">
+                    <small>请输入1-100000之间的正整数</small>
+                </div>
+                
+                <div class="form-group" id="randomDelayGroup" style="display: none;">
+                    <label for="delayMin">最小延时(毫秒):</label>
+                    <input type="number" id="delayMin" min="1" max="100000" step="1" value="1000">
+                    <label for="delayMax">最大延时(毫秒):</label>
+                    <input type="number" id="delayMax" min="1" max="100000" step="1" value="5000">
+                    <small>请输入1-100000之间的正整数</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 日志详情模态框 -->
+    <div id="logModal" class="modal">
+        <div class="modal-content log-modal-content">
+            <div class="modal-header">
+                <h3>请求详情</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="log-details">
+                <div class="log-section">
+                    <h4>基本信息</h4>
+                    <div id="logBasicInfo"></div>
+                </div>
+                <div class="log-section">
+                    <h4>请求头</h4>
+                    <pre id="logHeaders"></pre>
+                </div>
+                <div class="log-section">
+                    <h4>请求体</h4>
+                    <pre id="logBody"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
