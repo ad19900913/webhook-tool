@@ -39,11 +39,6 @@ function initializeSocket() {
 
 // 绑定事件
 function bindEvents() {
-    // 创建按钮
-    document.getElementById('createBtn').addEventListener('click', function() {
-        openWebhookModal();
-    });
-    
     // 侧边栏创建按钮
     document.getElementById('createBtn2').addEventListener('click', function() {
         openWebhookModal();
@@ -87,12 +82,42 @@ function bindEvents() {
     // Webhook过滤器
     document.getElementById('webhookFilter').addEventListener('change', function() {
         selectedWebhookFilter = this.value;
-        filterLogs();
+        loadLogsForWebhook();
+    });
+    
+    // 消息类型过滤器
+    document.getElementById('messageTypeFilter').addEventListener('change', function() {
+        selectedMessageTypeFilter = this.value;
+        loadLogsForWebhook();
+    });
+    
+    // 搜索功能
+    document.getElementById('tenantIdSearch').addEventListener('input', function() {
+        searchFilters.tenantId = this.value.trim();
+        applySearchFilters();
+    });
+    
+    document.getElementById('uniqueIdSearch').addEventListener('input', function() {
+        searchFilters.uniqueId = this.value.trim();
+        applySearchFilters();
+    });
+    
+    document.getElementById('clearSearchBtn').addEventListener('click', function() {
+        document.getElementById('tenantIdSearch').value = '';
+        document.getElementById('uniqueIdSearch').value = '';
+        searchFilters.tenantId = '';
+        searchFilters.uniqueId = '';
+        applySearchFilters();
     });
     
     // 清空日志按钮
     document.getElementById('clearLogsBtn').addEventListener('click', function() {
         clearLogs();
+    });
+    
+    // 清空所有日志按钮
+    document.getElementById('clearAllLogsBtn').addEventListener('click', function() {
+        clearAllLogs();
     });
 }
 
@@ -858,6 +883,11 @@ function fallbackCopyTextToClipboard(text) {
     }
     
     document.body.removeChild(textArea);
+}
+
+// 过滤日志（兼容旧代码）
+function filterLogs() {
+    loadLogsForWebhook();
 }
 
 function showNotification(message, type = 'info') {

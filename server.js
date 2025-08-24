@@ -32,6 +32,14 @@ function addLog(webhookId, logData) {
   
   const webhookData = webhookLogs.get(webhookId);
   
+  // 确保 webhookData 和其属性存在
+  if (!webhookData.all) {
+    webhookData.all = [];
+  }
+  if (!webhookData.byType) {
+    webhookData.byType = {};
+  }
+  
   // 确定消息类型
   let messageType = 'DEFAULT';
   if (logData.body && typeof logData.body === 'object' && logData.body.type) {
@@ -163,7 +171,10 @@ app.post('/api/webhooks', (req, res) => {
   };
   
   webhooks.set(webhookId, webhook);
-  webhookLogs.set(webhookId, []);
+  webhookLogs.set(webhookId, {
+    all: [],
+    byType: {}
+  });
   
   res.json({ id: webhookId, ...webhook });
 });
