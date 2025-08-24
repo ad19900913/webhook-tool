@@ -78,51 +78,53 @@
                 <span class="close">&times;</span>
             </div>
             <form id="webhookForm">
-                <div class="form-group">
-                    <label for="webhookName">名称:</label>
-                    <input type="text" id="webhookName" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="pathType">路径类型:</label>
-                    <select id="pathType">
-                        <option value="auto">自动生成</option>
-                        <option value="custom">自定义路径</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" id="customPathGroup" style="display: none;">
-                    <label for="customPath">自定义路径:</label>
-                    <input type="text" id="customPath" placeholder="例如: my-webhook">
-                    <small>完整地址将是: /webhook/your-path</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="webhookDescription">描述:</label>
-                    <textarea id="webhookDescription" rows="3"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label for="delayType">延时类型:</label>
-                    <select id="delayType">
-                        <option value="none">无延时</option>
-                        <option value="fixed">固定延时</option>
-                        <option value="random">随机延时</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" id="fixedDelayGroup" style="display: none;">
-                    <label for="delayValue">延时时间(毫秒):</label>
-                    <input type="number" id="delayValue" min="1" max="100000" step="1" value="1000">
-                    <small>请输入1-100000之间的正整数</small>
-                </div>
-                
-                <div class="form-group" id="randomDelayGroup" style="display: none;">
-                    <label for="delayMin">最小延时(毫秒):</label>
-                    <input type="number" id="delayMin" min="1" max="100000" step="1" value="1000">
-                    <label for="delayMax">最大延时(毫秒):</label>
-                    <input type="number" id="delayMax" min="1" max="100000" step="1" value="5000">
-                    <small>请输入1-100000之间的正整数</small>
+                <div class="form-content">
+                    <div class="form-group">
+                        <label for="webhookName">名称:</label>
+                        <input type="text" id="webhookName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pathType">路径类型:</label>
+                        <select id="pathType">
+                            <option value="auto">自动生成</option>
+                            <option value="custom">自定义路径</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="customPathGroup" style="display: none;">
+                        <label for="customPath">自定义路径:</label>
+                        <input type="text" id="customPath" placeholder="例如: my-webhook">
+                        <small>完整地址将是: /webhook/your-path</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="webhookDescription">描述:</label>
+                        <textarea id="webhookDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="delayType">延时类型:</label>
+                        <select id="delayType">
+                            <option value="none">无延时</option>
+                            <option value="fixed">固定延时</option>
+                            <option value="random">随机延时</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="fixedDelayGroup" style="display: none;">
+                        <label for="delayValue">延时时间(毫秒):</label>
+                        <input type="number" id="delayValue" min="1" max="100000" step="1" value="1000">
+                        <small>请输入1-100000之间的正整数</small>
+                    </div>
+                    
+                    <div class="form-group" id="randomDelayGroup" style="display: none;">
+                        <label for="delayMin">最小延时(毫秒):</label>
+                        <input type="number" id="delayMin" min="1" max="100000" step="1" value="1000">
+                        <label for="delayMax">最大延时(毫秒):</label>
+                        <input type="number" id="delayMax" min="1" max="100000" step="1" value="5000">
+                        <small>请输入1-100000之间的正整数</small>
+                    </div>
                 </div>
                 
                 <div class="form-actions">

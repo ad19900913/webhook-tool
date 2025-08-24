@@ -14,25 +14,89 @@ let searchFilters = {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 页面加载完成，开始初始化...');
+    testServerConnection();
     initializeSocket();
     loadWebhooks();
     bindEvents();
     startMemoryMonitoring();
 });
 
+// 测试服务器连接
+async function testServerConnection() {
+    try {
+        console.log('🔍 测试服务器连接...');
+        const response = await fetch('/api/system/status');
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ 服务器连接正常，系统状态:', data);
+            showNotification('服务器连接正常', 'success');
+        } else {
+            throw new Error(`服务器响应异常: ${response.status}`);
+        }
+    } catch (error) {
+        console.error('❌ 服务器连接测试失败:', error);
+        showNotification(`服务器连接失败: ${error.message}`, 'error');
+        
+        // 显示连接错误提示
+        const container = document.getElementById('webhookContainer');
+        container.innerHTML = `
+            <div class="no-logs">
+                <div style="color: #e74c3c; margin-bottom: 15px; font-size: 18px;">🚫 服务器连接失败</div>
+                <div style="color: #7f8c8d; margin-bottom: 10px;">无法连接到后端服务器</div>
+                <div style="font-size: 14px; color: #95a5a6; margin-bottom: 15px;">错误信息: ${error.message}</div>
+                <div style="font-size: 12px; color: #95a5a6;">
+                    <p>请检查：</p>
+                    <ul style="text-align: left; margin: 10px 0;">
+                        <li>服务器是否已启动 (node server.js)</li>
+                        <li>端口3000是否被占用</li>
+                        <li>网络连接是否正常</li>
+                    </ul>
+                </div>
+                <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 10px;">重新加载</button>
+            </div>
+        `;
+    }
+}
+
 // 初始化Socket连接
 function initializeSocket() {
-    socket = io();
+    console.log('正在初始化Socket连接...');
     
-    socket.on('connect', function() {
-        console.log('已连接到服务器');
+    socket = io({
+        timeout: 5000,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5
     });
     
-    socket.on('disconnect', function() {
-        console.log('与服务器断开连接');
+    socket.on('connect', function() {
+        console.log('✅ Socket已连接到服务器，ID:', socket.id);
+        showNotification('已连接到服务器', 'success');
+    });
+    
+    socket.on('disconnect', function(reason) {
+        console.log('❌ Socket与服务器断开连接，原因:', reason);
+        showNotification('与服务器断开连接', 'warning');
+    });
+    
+    socket.on('connect_error', function(error) {
+        console.error('❌ Socket连接错误:', error);
+        showNotification('连接服务器失败', 'error');
+    });
+    
+    socket.on('reconnect', function(attemptNumber) {
+        console.log('🔄 Socket重新连接成功，尝试次数:', attemptNumber);
+        showNotification('重新连接成功', 'success');
+    });
+    
+    socket.on('reconnect_error', function(error) {
+        console.error('❌ Socket重连失败:', error);
     });
     
     socket.on('webhook-log', function(data) {
+        console.log('📨 收到新的webhook日志:', data);
         addLogToUI(data.log, data.webhookId);
     });
 }
@@ -124,8 +188,16 @@ function bindEvents() {
 // 加载Webhook列表
 async function loadWebhooks() {
     try {
+        console.log('正在加载Webhook列表...');
         const response = await fetch('/api/webhooks');
+        console.log('Webhook列表响应状态:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('接收到的Webhook数据:', data);
         
         if (data.webhooks) {
             // 新格式：包含内存信息
@@ -136,11 +208,22 @@ async function loadWebhooks() {
             webhooks = data;
         }
         
+        console.log('Webhook列表加载成功，共', webhooks.length, '个');
         renderWebhooks();
         updateWebhookFilter();
     } catch (error) {
         console.error('加载Webhook列表失败:', error);
-        showNotification('加载Webhook列表失败', 'error');
+        showNotification(`加载Webhook列表失败: ${error.message}`, 'error');
+        
+        // 显示错误信息
+        const container = document.getElementById('webhookContainer');
+        container.innerHTML = `
+            <div class="no-logs">
+                <div style="color: #e74c3c; margin-bottom: 10px;">❌ 加载失败</div>
+                <div style="font-size: 14px; color: #7f8c8d;">错误信息: ${error.message}</div>
+                <div style="font-size: 12px; color: #95a5a6; margin-top: 10px;">请检查服务器是否正常运行</div>
+            </div>
+        `;
     }
 }
 
@@ -346,8 +429,17 @@ async function loadLogsForWebhook() {
     
     try {
         const url = `/api/webhooks/${selectedWebhookFilter}/logs?type=${selectedMessageTypeFilter}`;
+        console.log('正在加载日志，URL:', url);
+        
         const response = await fetch(url);
+        console.log('响应状态:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('接收到的日志数据:', data);
         
         allLogs = data.logs || [];
         currentTypeStats = data.typeStats || {};
@@ -355,9 +447,21 @@ async function loadLogsForWebhook() {
         applySearchFilters();
         updateMessageTypeFilter();
         updateTypeStatsDisplay();
+        
+        console.log('日志加载成功，共', allLogs.length, '条');
     } catch (error) {
         console.error('加载日志失败:', error);
-        showNotification('加载日志失败', 'error');
+        showNotification(`加载日志失败: ${error.message}`, 'error');
+        
+        // 显示详细错误信息
+        const container = document.getElementById('logsContainer');
+        container.innerHTML = `
+            <div class="no-logs">
+                <div style="color: #e74c3c; margin-bottom: 10px;">❌ 加载日志失败</div>
+                <div style="font-size: 14px; color: #7f8c8d;">错误信息: ${error.message}</div>
+                <div style="font-size: 12px; color: #95a5a6; margin-top: 10px;">请检查网络连接或刷新页面重试</div>
+            </div>
+        `;
     }
 }
 

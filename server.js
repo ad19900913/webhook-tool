@@ -229,9 +229,23 @@ app.delete('/api/webhooks/:id', (req, res) => {
 app.get('/api/webhooks/:id/logs', (req, res) => {
   const id = req.params.id;
   const type = req.query.type;
+  
+  console.log(`[API] 获取日志请求 - Webhook ID: ${id}, 类型: ${type || 'all'}`);
+  
+  // 检查webhook是否存在
+  if (!webhooks.has(id)) {
+    console.log(`[API] Webhook不存在: ${id}`);
+    return res.status(404).json({ 
+      error: 'Webhook不存在',
+      logs: [], 
+      typeStats: {}
+    });
+  }
+  
   const webhookData = webhookLogs.get(id);
   
   if (!webhookData) {
+    console.log(`[API] Webhook ${id} 暂无日志数据`);
     return res.json({ 
       logs: [], 
       typeStats: {},
@@ -243,9 +257,11 @@ app.get('/api/webhooks/:id/logs', (req, res) => {
   if (type && type !== 'all') {
     // 获取特定类型的日志
     logs = webhookData.byType[type] || [];
+    console.log(`[API] 返回 ${type} 类型日志 ${logs.length} 条`);
   } else {
     // 获取所有日志
     logs = webhookData.all || [];
+    console.log(`[API] 返回所有日志 ${logs.length} 条`);
   }
   
   // 统计各类型数量
@@ -255,6 +271,8 @@ app.get('/api/webhooks/:id/logs', (req, res) => {
       typeStats[msgType] = webhookData.byType[msgType].length;
     });
   }
+  
+  console.log(`[API] 类型统计:`, typeStats);
   
   res.json({
     logs: logs,
