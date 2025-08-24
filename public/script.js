@@ -1,6 +1,7 @@
 // 全局变量
 let socket;
 let webhooks = [];
+let allWebhooks = []; // 保存所有webhook用于搜索
 let logs = [];
 let allLogs = []; // 保存所有日志用于搜索
 let currentEditingWebhook = null;
@@ -11,6 +12,7 @@ let searchFilters = {
     tenantId: '',
     uniqueId: ''
 };
+let webhookSearchFilter = ''; // webhook名称搜索过滤器
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -183,6 +185,21 @@ function bindEvents() {
     document.getElementById('clearAllLogsBtn').addEventListener('click', function() {
         clearAllLogs();
     });
+    
+    // Webhook搜索功能
+    document.getElementById('webhookSearch').addEventListener('input', function() {
+        webhookSearchFilter = this.value.trim();
+        applyWebhookSearchFilter();
+        toggleClearWebhookSearchBtn();
+    });
+    
+    // 清空Webhook搜索按钮
+    document.getElementById('clearWebhookSearchBtn').addEventListener('click', function() {
+        document.getElementById('webhookSearch').value = '';
+        webhookSearchFilter = '';
+        applyWebhookSearchFilter();
+        toggleClearWebhookSearchBtn();
+    });
 }
 
 // 加载Webhook列表
@@ -201,15 +218,15 @@ async function loadWebhooks() {
         
         if (data.webhooks) {
             // 新格式：包含内存信息
-            webhooks = data.webhooks;
+            allWebhooks = data.webhooks;
             updateMemoryDisplay(data.memoryInfo);
         } else {
             // 兼容旧格式
-            webhooks = data;
+            allWebhooks = data;
         }
         
-        console.log('Webhook列表加载成功，共', webhooks.length, '个');
-        renderWebhooks();
+        console.log('Webhook列表加载成功，共', allWebhooks.length, '个');
+        applyWebhookSearchFilter();
         updateWebhookFilter();
     } catch (error) {
         console.error('加载Webhook列表失败:', error);
@@ -314,20 +331,71 @@ async function clearAllLogs() {
     }
 }
 
+// 应用Webhook搜索过滤器
+function applyWebhookSearchFilter() {
+    if (!webhookSearchFilter) {
+        webhooks = [...allWebhooks];
+    } else {
+        webhooks = allWebhooks.filter(webhook => 
+            webhook.name.toLowerCase().includes(webhookSearchFilter.toLowerCase())
+        );
+    }
+    
+    renderWebhooks();
+    updateSearchResultInfo();
+}
+
+// 切换清空搜索按钮显示
+function toggleClearWebhookSearchBtn() {
+    const clearBtn = document.getElementById('clearWebhookSearchBtn');
+    if (webhookSearchFilter) {
+        clearBtn.style.display = 'inline-block';
+    } else {
+        clearBtn.style.display = 'none';
+    }
+}
+
+// 更新搜索结果信息
+function updateSearchResultInfo() {
+    if (webhookSearchFilter && webhooks.length === 0) {
+        return true; // 表示没有搜索结果
+    }
+    return false;
+}
+
 // 渲染Webhook列表
 function renderWebhooks() {
     const container = document.getElementById('webhookContainer');
     
-    if (webhooks.length === 0) {
-        container.innerHTML = '<div class="no-logs">暂无Webhook，点击新建按钮创建第一个</div>';
+    // 检查搜索结果
+    if (updateSearchResultInfo()) {
         return;
     }
     
-    container.innerHTML = webhooks.map(webhook => `
+    if (webhooks.length === 0) {
+        const message = webhookSearchFilter ? 
+            '未找到匹配的Webhook' : 
+            '暂无Webhook，点击新建按钮创建第一个';
+        container.innerHTML = `<div class="no-logs">${message}</div>`;
+        return;
+    }
+    
+    // 生成搜索结果信息
+    let searchInfoHtml = '';
+    if (webhookSearchFilter && webhooks.length > 0) {
+        searchInfoHtml = `
+            <div class="search-result-info">
+                🔍 找到 <strong>${webhooks.length}</strong> 个匹配的Webhook，搜索词: <span class="search-term">"${escapeHtml(webhookSearchFilter)}"</span>
+            </div>
+        `;
+    }
+    
+    // 生成webhook列表
+    const webhookListHtml = webhooks.map(webhook => `
         <div class="webhook-item ${selectedWebhookFilter === webhook.id ? 'selected' : ''}" 
              onclick="selectWebhook('${webhook.id}')" data-webhook-id="${webhook.id}">
             <div class="webhook-info">
-                <h4>${escapeHtml(webhook.name)}</h4>
+                <h4>${highlightSearchTerm(escapeHtml(webhook.name), webhookSearchFilter, true)}</h4>
                 <div class="webhook-url-compact">
                     /webhook/${webhook.path}
                     <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); copyToClipboard('${window.location.origin}/webhook/${webhook.path}')">复制</button>
@@ -354,6 +422,8 @@ function renderWebhooks() {
             </div>
         </div>
     `).join('');
+    
+    container.innerHTML = searchInfoHtml + webhookListHtml;
 }
 
 // 紧凑版类型统计信息
@@ -831,14 +901,14 @@ function renderLogs() {
 }
 
 // 高亮搜索词
-function highlightSearchTerm(text, searchTerm) {
-    if (!searchTerm) return escapeHtml(text);
+function highlightSearchTerm(text, searchTerm, isWebhookSearch = false) {
+    if (!searchTerm) return text;
     
-    const escapedText = escapeHtml(text);
+    const highlightClass = isWebhookSearch ? 'webhook-search-highlight' : 'search-highlight';
     const escapedSearchTerm = escapeHtml(searchTerm);
     const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
     
-    return escapedText.replace(regex, '<span class="search-highlight">$1</span>');
+    return text.replace(regex, `<span class="${highlightClass}">$1</span>`);
 }
 
 // 清空日志
