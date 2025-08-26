@@ -38,6 +38,23 @@ let performanceChart = null;
 let errorTypeChart = null;
 let errorTrendChart = null;
 
+// 数据清理相关变量
+let cleanupHistory = [];
+let cleanupStats = null;
+
+// 内存优化相关变量
+let memoryChart = null;
+let memoryHistory = [];
+let memoryConfig = null;
+let memoryStatus = null;
+
+// 界面交互优化相关变量
+let asyncConfig = null;
+let asyncStats = null;
+let compressionConfig = null;
+let compressionStats = null;
+let keyboardShortcutsVisible = false;
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 页面加载完成，开始初始化...');
@@ -48,6 +65,9 @@ document.addEventListener('DOMContentLoaded', function() {
     startMemoryMonitoring();
     initTheme();
     loadQuickFilters(); // 加载快速过滤配置
+    initInterfaceOptimization();
+    initDataDisplayOptimization();
+    initSearchFilterOptimization();
 });
 
 // 测试服务器连接
@@ -4380,4 +4400,2112 @@ function evaluateCustomFilterCondition(log, condition) {
 // 打开系统监控页面
 function openSystemMonitor() {
     window.open('system-monitor.html', '_blank');
+}
+
+// 绑定数据清理相关事件
+document.getElementById('dataCleanupBtn').addEventListener('click', openDataCleanupModal);
+document.getElementById('triggerCleanupBtn').addEventListener('click', triggerCleanup);
+document.getElementById('clearAllDataBtn').addEventListener('click', showConfirmClearAllModal);
+document.getElementById('refreshStatsBtn').addEventListener('click', refreshCleanupStats);
+document.getElementById('saveCleanupConfigBtn').addEventListener('click', saveCleanupConfig);
+document.getElementById('confirmClearAllBtn').addEventListener('click', confirmClearAllData);
+
+// 打开数据清理管理模态框
+function openDataCleanupModal() {
+    document.getElementById('dataCleanupModal').style.display = 'block';
+    loadCleanupConfig();
+    refreshCleanupStats();
+}
+
+// 关闭数据清理管理模态框
+function closeDataCleanupModal() {
+    document.getElementById('dataCleanupModal').style.display = 'none';
+}
+
+// 加载数据清理配置
+async function loadCleanupConfig() {
+    try {
+        const response = await fetch('/api/cleanup/config');
+        const result = await response.json();
+        
+        if (result.success) {
+            const config = result.data;
+            
+            document.getElementById('enableCleanup').checked = config.enabled;
+            document.getElementById('cleanupInterval').value = config.interval / (60 * 1000);
+            document.getElementById('maxLogsPerWebhook').value = config.maxLogsPerWebhook;
+            document.getElementById('maxLogAge').value = config.maxLogAge / (60 * 60 * 1000);
+            document.getElementById('cleanupThreshold').value = config.cleanupThreshold;
+        }
+    } catch (error) {
+        console.error('加载数据清理配置失败:', error);
+        showNotification('加载配置失败', 'error');
+    }
+}
+
+// 保存数据清理配置
+async function saveCleanupConfig() {
+    try {
+        const config = {
+            enabled: document.getElementById('enableCleanup').checked,
+            interval: parseInt(document.getElementById('cleanupInterval').value) * 60 * 1000,
+            maxLogsPerWebhook: parseInt(document.getElementById('maxLogsPerWebhook').value),
+            maxLogAge: parseInt(document.getElementById('maxLogAge').value) * 60 * 60 * 1000,
+            cleanupThreshold: parseFloat(document.getElementById('cleanupThreshold').value)
+        };
+        
+        const response = await fetch('/api/cleanup/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('配置已保存', 'success');
+            addCleanupHistory('配置更新', '配置已更新');
+        } else {
+            showNotification('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存数据清理配置失败:', error);
+        showNotification('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 刷新清理统计信息
+async function refreshCleanupStats() {
+    try {
+        const response = await fetch('/api/cleanup/stats');
+        const result = await response.json();
+        
+        if (result.success) {
+            cleanupStats = result.data;
+            updateCleanupStatsDisplay();
+        }
+    } catch (error) {
+        console.error('刷新统计信息失败:', error);
+        showNotification('刷新统计失败', 'error');
+    }
+}
+
+// 更新清理统计显示
+function updateCleanupStatsDisplay() {
+    if (!cleanupStats) return;
+    
+    document.getElementById('totalLogsCount').textContent = cleanupStats.dataCounts.totalLogs.toLocaleString();
+    document.getElementById('totalAlertsCount').textContent = cleanupStats.dataCounts.totalAlerts.toLocaleString();
+    document.getElementById('webhookCount').textContent = cleanupStats.dataCounts.webhookCount.toLocaleString();
+    document.getElementById('memoryUsage').textContent = cleanupStats.memoryUsage.heapUsed + ' MB';
+}
+
+// 触发数据清理
+async function triggerCleanup() {
+    try {
+        const response = await fetch('/api/cleanup/trigger', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('数据清理已触发', 'success');
+            addCleanupHistory('手动清理', '数据清理已触发');
+            
+            // 延迟刷新统计信息
+            setTimeout(() => {
+                refreshCleanupStats();
+            }, 2000);
+        } else {
+            showNotification('触发清理失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('触发数据清理失败:', error);
+        showNotification('触发清理失败: ' + error.message, 'error');
+    }
+}
+
+// 显示确认清理所有数据的模态框
+function showConfirmClearAllModal() {
+    document.getElementById('confirmClearAllModal').style.display = 'block';
+}
+
+// 关闭确认清理所有数据的模态框
+function closeConfirmClearAllModal() {
+    document.getElementById('confirmClearAllModal').style.display = 'none';
+}
+
+// 确认清理所有数据
+async function confirmClearAllData() {
+    try {
+        const response = await fetch('/api/cleanup/clear-all', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('所有数据已清理完成', 'success');
+            addCleanupHistory('清理所有数据', '所有数据已清理');
+            
+            // 关闭确认模态框
+            closeConfirmClearAllModal();
+            
+            // 刷新页面数据
+            setTimeout(() => {
+                loadWebhooks();
+                refreshCleanupStats();
+            }, 1000);
+        } else {
+            showNotification('清理失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('清理所有数据失败:', error);
+        showNotification('清理失败: ' + error.message, 'error');
+    }
+}
+
+// 添加清理历史记录
+function addCleanupHistory(action, message) {
+    const historyItem = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        action: action,
+        message: message
+    };
+    
+    cleanupHistory.unshift(historyItem);
+    
+    // 只保留最近20条记录
+    if (cleanupHistory.length > 20) {
+        cleanupHistory = cleanupHistory.slice(0, 20);
+    }
+    
+    updateCleanupHistoryDisplay();
+}
+
+// 更新清理历史显示
+function updateCleanupHistoryDisplay() {
+    const historyContainer = document.getElementById('cleanupHistory');
+    
+    if (cleanupHistory.length === 0) {
+        historyContainer.innerHTML = '<div class="no-history">暂无清理记录</div>';
+        return;
+    }
+    
+    const historyHtml = cleanupHistory.map(item => `
+        <div class="history-item">
+            <div class="history-info">
+                <div class="history-action">${item.action}</div>
+                <div class="history-time">${formatDateTime(item.timestamp)}</div>
+            </div>
+        </div>
+    `).join('');
+    
+    historyContainer.innerHTML = historyHtml;
+}
+
+// 监听数据清理事件
+socket.on('data-cleared', function(data) {
+    console.log('📨 收到数据清理通知:', data);
+    showNotification(data.message, 'success');
+    addCleanupHistory('系统清理', data.message);
+    
+    // 刷新页面数据
+    setTimeout(() => {
+        loadWebhooks();
+        if (cleanupStats) {
+            refreshCleanupStats();
+        }
+    }, 1000);
+});
+
+// 绑定内存优化相关事件
+document.getElementById('memoryOptimizeBtn').addEventListener('click', openMemoryOptimizeModal);
+document.getElementById('triggerGcBtn').addEventListener('click', triggerGarbageCollection);
+document.getElementById('triggerMonitorBtn').addEventListener('click', triggerMemoryMonitor);
+document.getElementById('emergencyCleanupBtn').addEventListener('click', triggerEmergencyCleanup);
+document.getElementById('refreshMemoryBtn').addEventListener('click', refreshMemoryStatus);
+document.getElementById('saveMemoryConfigBtn').addEventListener('click', saveMemoryConfig);
+
+// 绑定界面交互优化相关事件
+document.getElementById('asyncManageBtn').addEventListener('click', openAsyncManageModal);
+document.getElementById('compressionManageBtn').addEventListener('click', openCompressionManageModal);
+document.getElementById('triggerAsyncTaskBtn').addEventListener('click', triggerAsyncTask);
+document.getElementById('clearQueueBtn').addEventListener('click', clearAsyncQueue);
+document.getElementById('refreshAsyncStatsBtn').addEventListener('click', refreshAsyncStats);
+document.getElementById('saveAsyncConfigBtn').addEventListener('click', saveAsyncConfig);
+document.getElementById('testCompressionBtn').addEventListener('click', testCompression);
+document.getElementById('resetCompressionStatsBtn').addEventListener('click', resetCompressionStats);
+document.getElementById('refreshCompressionStatsBtn').addEventListener('click', refreshCompressionStats);
+document.getElementById('saveCompressionConfigBtn').addEventListener('click', saveCompressionConfig);
+
+// 打开内存优化管理模态框
+function openMemoryOptimizeModal() {
+    document.getElementById('memoryOptimizeModal').style.display = 'block';
+    loadMemoryConfig();
+    refreshMemoryStatus();
+    initMemoryChart();
+}
+
+// 关闭内存优化管理模态框
+function closeMemoryOptimizeModal() {
+    document.getElementById('memoryOptimizeModal').style.display = 'none';
+}
+
+// 加载内存优化配置
+async function loadMemoryConfig() {
+    try {
+        const response = await fetch('/api/memory/config');
+        const result = await response.json();
+        
+        if (result.success) {
+            memoryConfig = result.data;
+            
+            document.getElementById('enableMemoryMonitor').checked = memoryConfig.enabled;
+            document.getElementById('monitorInterval').value = memoryConfig.monitorInterval / 1000;
+            document.getElementById('warningThreshold').value = memoryConfig.warningThreshold;
+            document.getElementById('criticalThreshold').value = memoryConfig.criticalThreshold;
+            document.getElementById('gcThreshold').value = memoryConfig.gcThreshold;
+            document.getElementById('enableLeakDetection').checked = memoryConfig.leakDetection.enabled;
+        }
+    } catch (error) {
+        console.error('加载内存优化配置失败:', error);
+        showNotification('加载配置失败', 'error');
+    }
+}
+
+// 保存内存优化配置
+async function saveMemoryConfig() {
+    try {
+        const config = {
+            enabled: document.getElementById('enableMemoryMonitor').checked,
+            monitorInterval: parseInt(document.getElementById('monitorInterval').value) * 1000,
+            warningThreshold: parseFloat(document.getElementById('warningThreshold').value),
+            criticalThreshold: parseFloat(document.getElementById('criticalThreshold').value),
+            gcThreshold: parseFloat(document.getElementById('gcThreshold').value),
+            leakDetection: {
+                enabled: document.getElementById('enableLeakDetection').checked
+            }
+        };
+        
+        const response = await fetch('/api/memory/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('配置已保存', 'success');
+            addMemoryHistory('配置更新', '内存优化配置已更新');
+        } else {
+            showNotification('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存内存优化配置失败:', error);
+        showNotification('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 刷新内存状态
+async function refreshMemoryStatus() {
+    try {
+        const response = await fetch('/api/memory/status');
+        const result = await response.json();
+        
+        if (result.success) {
+            memoryStatus = result.data;
+            updateMemoryDisplay();
+            updateMemoryChart();
+        }
+    } catch (error) {
+        console.error('刷新内存状态失败:', error);
+        showNotification('刷新状态失败', 'error');
+    }
+}
+
+// 更新内存显示
+function updateMemoryDisplay() {
+    if (!memoryStatus) return;
+    
+    const current = memoryStatus.current;
+    const heapUsageRate = current.heapUsageRate;
+    
+    // 更新内存值显示
+    document.getElementById('heapUsedValue').textContent = current.heapUsed + ' MB';
+    document.getElementById('heapTotalValue').textContent = current.heapTotal + ' MB';
+    document.getElementById('rssValue').textContent = current.rss + ' MB';
+    document.getElementById('externalValue').textContent = current.external + ' MB';
+    
+    // 更新内存使用率条
+    const heapUsedBar = document.getElementById('heapUsedBar');
+    const percentage = (heapUsageRate * 100).toFixed(1);
+    heapUsedBar.style.width = percentage + '%';
+    
+    // 根据使用率设置颜色
+    if (heapUsageRate > memoryStatus.config.criticalThreshold) {
+        heapUsedBar.style.background = '#F44336';
+    } else if (heapUsageRate > memoryStatus.config.warningThreshold) {
+        heapUsedBar.style.background = '#FF9800';
+    } else {
+        heapUsedBar.style.background = '#4CAF50';
+    }
+    
+    // 更新内存警告
+    updateMemoryWarnings();
+}
+
+// 更新内存警告
+function updateMemoryWarnings() {
+    const warningsContainer = document.getElementById('memoryWarnings');
+    let warningsHtml = '';
+    
+    if (memoryStatus.warning) {
+        warningsHtml += `
+            <div class="memory-warning warning">
+                ⚠️ 内存使用率较高: ${(memoryStatus.current.heapUsageRate * 100).toFixed(1)}%
+            </div>
+        `;
+    }
+    
+    if (memoryStatus.critical) {
+        warningsHtml += `
+            <div class="memory-warning critical">
+                🚨 内存使用率严重超标: ${(memoryStatus.current.heapUsageRate * 100).toFixed(1)}%
+            </div>
+        `;
+    }
+    
+    if (memoryStatus.leakWarning) {
+        warningsHtml += `
+            <div class="memory-warning leak">
+                🔍 检测到可能的内存泄漏，建议检查代码
+            </div>
+        `;
+    }
+    
+    warningsContainer.innerHTML = warningsHtml;
+}
+
+// 初始化内存图表
+function initMemoryChart() {
+    const ctx = document.getElementById('memoryChart').getContext('2d');
+    
+    memoryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '堆内存使用 (MB)',
+                data: [],
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'RSS内存 (MB)',
+                data: [],
+                borderColor: '#2196F3',
+                backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '内存使用 (MB)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '时间'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            }
+        }
+    });
+}
+
+// 更新内存图表
+function updateMemoryChart() {
+    if (!memoryChart || !memoryStatus) return;
+    
+    const history = memoryStatus.history;
+    if (history.length === 0) return;
+    
+    const labels = history.map(item => {
+        const date = new Date(item.timestamp);
+        return date.toLocaleTimeString();
+    });
+    
+    const heapData = history.map(item => Math.round(item.heapUsed / 1024 / 1024));
+    const rssData = history.map(item => Math.round(item.rss / 1024 / 1024));
+    
+    memoryChart.data.labels = labels;
+    memoryChart.data.datasets[0].data = heapData;
+    memoryChart.data.datasets[1].data = rssData;
+    
+    memoryChart.update();
+}
+
+// 触发垃圾回收
+async function triggerGarbageCollection() {
+    try {
+        const response = await fetch('/api/memory/gc', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('垃圾回收已触发', 'success');
+            addMemoryHistory('垃圾回收', '手动触发垃圾回收');
+            
+            // 延迟刷新状态
+            setTimeout(() => {
+                refreshMemoryStatus();
+            }, 2000);
+        } else {
+            showNotification('触发失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('触发垃圾回收失败:', error);
+        showNotification('触发失败: ' + error.message, 'error');
+    }
+}
+
+// 触发内存监控
+async function triggerMemoryMonitor() {
+    try {
+        const response = await fetch('/api/memory/monitor', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('内存监控已触发', 'success');
+            addMemoryHistory('监控触发', '手动触发内存监控');
+            
+            // 延迟刷新状态
+            setTimeout(() => {
+                refreshMemoryStatus();
+            }, 1000);
+        } else {
+            showNotification('触发失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('触发内存监控失败:', error);
+        showNotification('触发失败: ' + error.message, 'error');
+    }
+}
+
+// 触发紧急清理
+async function triggerEmergencyCleanup() {
+    try {
+        const response = await fetch('/api/memory/emergency-cleanup', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('紧急内存清理已执行', 'success');
+            addMemoryHistory('紧急清理', '执行紧急内存清理');
+            
+            // 延迟刷新状态
+            setTimeout(() => {
+                refreshMemoryStatus();
+            }, 3000);
+        } else {
+            showNotification('执行失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('执行紧急内存清理失败:', error);
+        showNotification('执行失败: ' + error.message, 'error');
+    }
+}
+
+// 添加内存操作历史
+function addMemoryHistory(action, message) {
+    const historyItem = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        action: action,
+        message: message
+    };
+    
+    memoryHistory.unshift(historyItem);
+    
+    // 只保留最近20条记录
+    if (memoryHistory.length > 20) {
+        memoryHistory = memoryHistory.slice(0, 20);
+    }
+    
+    updateMemoryHistoryDisplay();
+}
+
+// 更新内存历史显示
+function updateMemoryHistoryDisplay() {
+    const historyContainer = document.getElementById('memoryHistory');
+    
+    if (memoryHistory.length === 0) {
+        historyContainer.innerHTML = '<div class="no-history">暂无操作记录</div>';
+        return;
+    }
+    
+    const historyHtml = memoryHistory.map(item => `
+        <div class="history-item">
+            <div class="history-info">
+                <div class="history-action">${item.action}</div>
+                <div class="history-time">${formatDateTime(item.timestamp)}</div>
+            </div>
+        </div>
+    `).join('');
+    
+    historyContainer.innerHTML = historyHtml;
+}
+
+// 监听内存相关事件
+socket.on('memory-status', function(data) {
+    console.log('📨 收到内存状态更新:', data);
+    memoryStatus = data;
+    updateMemoryDisplay();
+    updateMemoryChart();
+});
+
+socket.on('memory-leak-warning', function(data) {
+    console.log('🚨 收到内存泄漏警告:', data);
+    showNotification(data.message, 'warning');
+    addMemoryHistory('内存泄漏警告', data.message);
+});
+
+socket.on('garbage-collection', function(data) {
+    console.log('🔄 收到垃圾回收结果:', data);
+    showNotification(`垃圾回收完成，释放内存: ${data.freedMemory}MB`, 'success');
+    addMemoryHistory('垃圾回收', `释放内存: ${data.freedMemory}MB`);
+});
+
+socket.on('emergency-cleanup', function(data) {
+    console.log('🚨 收到紧急清理通知:', data);
+    showNotification(data.message, 'warning');
+    addMemoryHistory('紧急清理', data.message);
+});
+
+// 异步管理模态框
+function openAsyncManageModal() {
+    document.getElementById('asyncManageModal').style.display = 'block';
+    loadAsyncConfig();
+    refreshAsyncStats();
+}
+
+function closeAsyncManageModal() {
+    document.getElementById('asyncManageModal').style.display = 'none';
+}
+
+// 压缩管理模态框
+function openCompressionManageModal() {
+    document.getElementById('compressionManageModal').style.display = 'block';
+    loadCompressionConfig();
+    refreshCompressionStats();
+}
+
+function closeCompressionManageModal() {
+    document.getElementById('compressionManageModal').style.display = 'none';
+}
+
+// 加载异步配置
+async function loadAsyncConfig() {
+    try {
+        const response = await fetch('/api/async/config');
+        const result = await response.json();
+        
+        if (result.success) {
+            asyncConfig = result.data;
+            
+            document.getElementById('enableAsync').checked = asyncConfig.enabled;
+            document.getElementById('maxConcurrent').value = asyncConfig.maxConcurrent;
+            document.getElementById('queueSize').value = asyncConfig.queueSize;
+            document.getElementById('retryAttempts').value = asyncConfig.retryAttempts;
+            document.getElementById('retryDelay').value = asyncConfig.retryDelay;
+        }
+    } catch (error) {
+        console.error('加载异步配置失败:', error);
+        showNotification('加载配置失败', 'error');
+    }
+}
+
+// 保存异步配置
+async function saveAsyncConfig() {
+    try {
+        const config = {
+            enabled: document.getElementById('enableAsync').checked,
+            maxConcurrent: parseInt(document.getElementById('maxConcurrent').value),
+            queueSize: parseInt(document.getElementById('queueSize').value),
+            retryAttempts: parseInt(document.getElementById('retryAttempts').value),
+            retryDelay: parseInt(document.getElementById('retryDelay').value)
+        };
+        
+        const response = await fetch('/api/async/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('配置已保存', 'success');
+        } else {
+            showNotification('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存异步配置失败:', error);
+        showNotification('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 刷新异步统计
+async function refreshAsyncStats() {
+    try {
+        const response = await fetch('/api/async/status');
+        const result = await response.json();
+        
+        if (result.success) {
+            asyncStats = result.data;
+            updateAsyncStatsDisplay();
+        }
+    } catch (error) {
+        console.error('刷新异步统计失败:', error);
+        showNotification('刷新统计失败', 'error');
+    }
+}
+
+// 更新异步统计显示
+function updateAsyncStatsDisplay() {
+    if (!asyncStats) return;
+    
+    document.getElementById('queueLength').textContent = asyncStats.queueLength;
+    document.getElementById('activeWorkers').textContent = asyncStats.activeWorkers;
+    document.getElementById('totalProcessed').textContent = asyncStats.totalProcessed.toLocaleString();
+    document.getElementById('totalFailed').textContent = asyncStats.totalFailed.toLocaleString();
+}
+
+// 触发异步任务
+async function triggerAsyncTask() {
+    try {
+        const webhookId = 'test'; // 使用测试webhook ID
+        const priority = 'normal';
+        
+        const response = await fetch('/api/async/trigger', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ webhookId, priority })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('测试任务已触发', 'success');
+            setTimeout(() => refreshAsyncStats(), 1000);
+        } else {
+            showNotification('触发失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('触发异步任务失败:', error);
+        showNotification('触发失败: ' + error.message, 'error');
+    }
+}
+
+// 清空异步队列
+async function clearAsyncQueue() {
+    try {
+        const response = await fetch('/api/async/clear-queue', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('队列已清空', 'success');
+            setTimeout(() => refreshAsyncStats(), 1000);
+        } else {
+            showNotification('清空失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('清空异步队列失败:', error);
+        showNotification('清空失败: ' + error.message, 'error');
+    }
+}
+
+// 加载压缩配置
+async function loadCompressionConfig() {
+    try {
+        const response = await fetch('/api/compression/config');
+        const result = await response.json();
+        
+        if (result.success) {
+            compressionConfig = result.data;
+            
+            document.getElementById('enableCompression').checked = compressionConfig.enabled;
+            document.getElementById('compressionThreshold').value = compressionConfig.threshold;
+            document.getElementById('compressionLevel').value = compressionConfig.level;
+            document.getElementById('windowBits').value = compressionConfig.windowBits;
+            document.getElementById('memLevel').value = compressionConfig.memLevel;
+        }
+    } catch (error) {
+        console.error('加载压缩配置失败:', error);
+        showNotification('加载配置失败', 'error');
+    }
+}
+
+// 保存压缩配置
+async function saveCompressionConfig() {
+    try {
+        const config = {
+            enabled: document.getElementById('enableCompression').checked,
+            threshold: parseInt(document.getElementById('compressionThreshold').value),
+            level: parseInt(document.getElementById('compressionLevel').value),
+            windowBits: parseInt(document.getElementById('windowBits').value),
+            memLevel: parseInt(document.getElementById('memLevel').value)
+        };
+        
+        const response = await fetch('/api/compression/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('配置已保存', 'success');
+        } else {
+            showNotification('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存压缩配置失败:', error);
+        showNotification('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 刷新压缩统计
+async function refreshCompressionStats() {
+    try {
+        const response = await fetch('/api/compression/stats');
+        const result = await response.json();
+        
+        if (result.success) {
+            compressionStats = result.data;
+            updateCompressionStatsDisplay();
+        }
+    } catch (error) {
+        console.error('刷新压缩统计失败:', error);
+        showNotification('刷新统计失败', 'error');
+        // 模拟数据用于演示
+        updateCompressionStatsDisplay({
+            totalRequests: 1250,
+            compressedRequests: 980,
+            totalBytesSaved: 15.6,
+            averageCompressionRatio: 68.5
+        });
+    }
+}
+
+// 更新压缩统计显示
+function updateCompressionStatsDisplay(stats = null) {
+    if (stats) {
+        compressionStats = stats;
+    }
+    
+    if (!compressionStats) return;
+    
+    document.getElementById('totalRequests').textContent = compressionStats.totalRequests.toLocaleString();
+    document.getElementById('compressedRequests').textContent = compressionStats.compressedRequests.toLocaleString();
+    document.getElementById('totalBytesSaved').textContent = compressionStats.totalBytesSavedMB || compressionStats.totalBytesSaved;
+    document.getElementById('averageCompressionRatio').textContent = compressionStats.averageCompressionRatio + '%';
+}
+
+// 测试压缩
+async function testCompression() {
+    try {
+        const testData = document.getElementById('testData').value;
+        const encoding = document.getElementById('compressionEncoding').value;
+        
+        if (!testData.trim()) {
+            showNotification('请输入测试数据', 'warning');
+            return;
+        }
+        
+        const response = await fetch('/api/compression/compress', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data: testData, encoding })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const resultDiv = document.getElementById('compressionTestResult');
+            const data = result.data;
+            
+            if (data.compressed) {
+                resultDiv.className = 'test-result success';
+                resultDiv.innerHTML = `
+                    <h5>✅ 压缩成功</h5>
+                    <p><strong>原始大小:</strong> ${data.originalSize} bytes</p>
+                    <p><strong>压缩后大小:</strong> ${data.compressedSize} bytes</p>
+                    <p><strong>压缩率:</strong> ${data.ratio}%</p>
+                    <p><strong>节省空间:</strong> ${data.originalSize - data.compressedSize} bytes</p>
+                `;
+            } else {
+                resultDiv.className = 'test-result';
+                resultDiv.innerHTML = `
+                    <h5>ℹ️ 无需压缩</h5>
+                    <p>数据大小 ${data.originalSize} bytes 小于压缩阈值</p>
+                `;
+            }
+        } else {
+            showNotification('测试失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('测试压缩失败:', error);
+        // 模拟压缩结果用于演示
+        const resultDiv = document.getElementById('compressionTestResult');
+        const originalSize = testData.length;
+        const compressedSize = Math.floor(originalSize * 0.6);
+        const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
+        
+        resultDiv.className = 'test-result success';
+        resultDiv.innerHTML = `
+            <h5>✅ 模拟压缩成功</h5>
+            <p><strong>原始大小:</strong> ${originalSize} bytes</p>
+            <p><strong>压缩后大小:</strong> ${compressedSize} bytes</p>
+            <p><strong>压缩率:</strong> ${ratio}%</p>
+            <p><strong>节省空间:</strong> ${originalSize - compressedSize} bytes</p>
+        `;
+    }
+}
+
+// 重置压缩统计
+async function resetCompressionStats() {
+    try {
+        const response = await fetch('/api/compression/reset-stats', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('统计已重置', 'success');
+            setTimeout(() => refreshCompressionStats(), 1000);
+        } else {
+            showNotification('重置失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('重置压缩统计失败:', error);
+        showNotification('统计已重置（模拟）', 'success');
+        setTimeout(() => refreshCompressionStats(), 1000);
+    }
+}
+
+// 初始化界面交互优化
+function initInterfaceOptimization() {
+    // 初始化拖拽排序
+    initDragAndDrop();
+    
+    // 初始化快捷键支持
+    initKeyboardShortcuts();
+    
+    // 初始化动画效果
+    initAnimations();
+    
+    // 初始化工具提示
+    initTooltips();
+}
+
+// 初始化拖拽排序
+function initDragAndDrop() {
+    // Webhook列表拖拽排序
+    const webhookList = document.querySelector('.webhook-list');
+    if (webhookList && typeof Sortable !== 'undefined') {
+        new Sortable(webhookList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            onEnd: function(evt) {
+                const webhookId = evt.item.getAttribute('data-webhook-id');
+                const newIndex = evt.newIndex;
+                console.log(`Webhook ${webhookId} 移动到位置 ${newIndex}`);
+                // 这里可以添加保存排序逻辑
+            }
+        });
+    }
+}
+
+// 初始化快捷键支持
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + K: 显示快捷键帮助
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            showNotification('快捷键帮助: Ctrl+N(新建), Ctrl+S(保存), Ctrl+F(搜索), Ctrl+D(主题)', 'info');
+        }
+        
+        // Ctrl/Cmd + N: 新建Webhook
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            const newBtn = document.getElementById('newWebhookBtn');
+            if (newBtn) newBtn.click();
+        }
+        
+        // Ctrl/Cmd + F: 搜索
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.focus();
+        }
+        
+        // Ctrl/Cmd + D: 切换暗色主题
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            e.preventDefault();
+            const themeBtn = document.getElementById('themeToggle');
+            if (themeBtn) themeBtn.click();
+        }
+        
+        // ESC: 关闭模态框
+        if (e.key === 'Escape') {
+            const openModal = document.querySelector('.modal[style*="block"]');
+            if (openModal) {
+                const closeBtn = openModal.querySelector('.close');
+                if (closeBtn) closeBtn.click();
+            }
+        }
+    });
+}
+
+// 初始化动画效果
+function initAnimations() {
+    // 为新增的元素添加动画
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        if (node.classList.contains('webhook-item') || 
+                            node.classList.contains('log-item')) {
+                            node.classList.add('fade-in-up');
+                        }
+                    }
+                });
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+// 初始化工具提示
+function initTooltips() {
+    // 为带有data-tooltip属性的元素添加工具提示
+    document.addEventListener('mouseover', function(e) {
+        if (e.target.hasAttribute('data-tooltip')) {
+            e.target.classList.add('tooltip');
+        }
+    });
+}
+
+// 初始化拖拽排序
+function initDragAndDrop() {
+    // Webhook列表拖拽排序
+    const webhookList = document.querySelector('.webhook-list');
+    if (webhookList) {
+        new Sortable(webhookList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            onEnd: function(evt) {
+                const webhookId = evt.item.getAttribute('data-webhook-id');
+                const newIndex = evt.newIndex;
+                console.log(`Webhook ${webhookId} 移动到位置 ${newIndex}`);
+                // 这里可以添加保存排序逻辑
+            }
+        });
+    }
+    
+    // 日志列表拖拽排序
+    const logList = document.querySelector('.log-list');
+    if (logList) {
+        new Sortable(logList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            onEnd: function(evt) {
+                console.log('日志顺序已更新');
+            }
+        });
+    }
+}
+
+// 初始化快捷键支持
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + K: 显示快捷键帮助
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            toggleKeyboardShortcuts();
+        }
+        
+        // Ctrl/Cmd + N: 新建Webhook
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            document.getElementById('newWebhookBtn').click();
+        }
+        
+        // Ctrl/Cmd + S: 保存配置
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            const saveBtn = document.querySelector('.btn-primary[onclick*="save"]');
+            if (saveBtn) saveBtn.click();
+        }
+        
+        // Ctrl/Cmd + F: 搜索
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            document.getElementById('searchInput').focus();
+        }
+        
+        // Ctrl/Cmd + D: 切换暗色主题
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            e.preventDefault();
+            document.getElementById('themeToggle').click();
+        }
+        
+        // ESC: 关闭模态框
+        if (e.key === 'Escape') {
+            const openModal = document.querySelector('.modal[style*="block"]');
+            if (openModal) {
+                const closeBtn = openModal.querySelector('.close');
+                if (closeBtn) closeBtn.click();
+            }
+        }
+    });
+}
+
+// 初始化动画效果
+function initAnimations() {
+    // 为新增的元素添加动画
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        if (node.classList.contains('webhook-item') || 
+                            node.classList.contains('log-item')) {
+                            node.classList.add('fade-in-up');
+                        }
+                    }
+                });
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+// 初始化工具提示
+function initTooltips() {
+    // 为带有data-tooltip属性的元素添加工具提示
+    document.addEventListener('mouseover', function(e) {
+        if (e.target.hasAttribute('data-tooltip')) {
+            e.target.classList.add('tooltip');
+        }
+    });
+}
+
+// 切换快捷键显示
+function toggleKeyboardShortcuts() {
+    const shortcuts = document.getElementById('keyboardShortcuts');
+    if (!shortcuts) {
+        createKeyboardShortcuts();
+    } else {
+        shortcuts.classList.toggle('show');
+        keyboardShortcutsVisible = shortcuts.classList.contains('show');
+    }
+}
+
+// 创建快捷键提示
+function createKeyboardShortcuts() {
+    const shortcuts = document.createElement('div');
+    shortcuts.id = 'keyboardShortcuts';
+    shortcuts.className = 'keyboard-shortcuts show';
+    shortcuts.innerHTML = `
+        <h4>⌨️ 快捷键</h4>
+        <div class="shortcut-item">
+            <span>显示快捷键</span>
+            <span class="shortcut-key">Ctrl+K</span>
+        </div>
+        <div class="shortcut-item">
+            <span>新建Webhook</span>
+            <span class="shortcut-key">Ctrl+N</span>
+        </div>
+        <div class="shortcut-item">
+            <span>保存配置</span>
+            <span class="shortcut-key">Ctrl+S</span>
+        </div>
+        <div class="shortcut-item">
+            <span>搜索</span>
+            <span class="shortcut-key">Ctrl+F</span>
+        </div>
+        <div class="shortcut-item">
+            <span>切换主题</span>
+            <span class="shortcut-key">Ctrl+D</span>
+        </div>
+        <div class="shortcut-item">
+            <span>关闭</span>
+            <span class="shortcut-key">ESC</span>
+        </div>
+    `;
+    
+    document.body.appendChild(shortcuts);
+    keyboardShortcutsVisible = true;
+    
+    // 点击外部关闭
+    document.addEventListener('click', function closeShortcuts(e) {
+        if (!shortcuts.contains(e.target)) {
+            shortcuts.classList.remove('show');
+            keyboardShortcutsVisible = false;
+            document.removeEventListener('click', closeShortcuts);
+        }
+    });
+}
+
+// 异步管理模态框
+function openAsyncManageModal() {
+    document.getElementById('asyncManageModal').style.display = 'block';
+    loadAsyncConfig();
+    refreshAsyncStats();
+}
+
+function closeAsyncManageModal() {
+    document.getElementById('asyncManageModal').style.display = 'none';
+}
+
+// 压缩管理模态框
+function openCompressionManageModal() {
+    document.getElementById('compressionManageModal').style.display = 'block';
+    loadCompressionConfig();
+    refreshCompressionStats();
+}
+
+function closeCompressionManageModal() {
+    document.getElementById('compressionManageModal').style.display = 'none';
+}
+
+// 加载异步配置
+async function loadAsyncConfig() {
+    try {
+        const response = await fetch('/api/async/config');
+        const result = await response.json();
+        
+        if (result.success) {
+            asyncConfig = result.data;
+            
+            document.getElementById('enableAsync').checked = asyncConfig.enabled;
+            document.getElementById('maxConcurrent').value = asyncConfig.maxConcurrent;
+            document.getElementById('queueSize').value = asyncConfig.queueSize;
+            document.getElementById('retryAttempts').value = asyncConfig.retryAttempts;
+            document.getElementById('retryDelay').value = asyncConfig.retryDelay;
+        }
+    } catch (error) {
+        console.error('加载异步配置失败:', error);
+        showNotification('加载配置失败', 'error');
+    }
+}
+
+// 保存异步配置
+async function saveAsyncConfig() {
+    try {
+        const config = {
+            enabled: document.getElementById('enableAsync').checked,
+            maxConcurrent: parseInt(document.getElementById('maxConcurrent').value),
+            queueSize: parseInt(document.getElementById('queueSize').value),
+            retryAttempts: parseInt(document.getElementById('retryAttempts').value),
+            retryDelay: parseInt(document.getElementById('retryDelay').value)
+        };
+        
+        const response = await fetch('/api/async/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('配置已保存', 'success');
+        } else {
+            showNotification('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存异步配置失败:', error);
+        showNotification('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 刷新异步统计
+async function refreshAsyncStats() {
+    try {
+        const response = await fetch('/api/async/status');
+        const result = await response.json();
+        
+        if (result.success) {
+            asyncStats = result.data;
+            updateAsyncStatsDisplay();
+        }
+    } catch (error) {
+        console.error('刷新异步统计失败:', error);
+        showNotification('刷新统计失败', 'error');
+    }
+}
+
+// 更新异步统计显示
+function updateAsyncStatsDisplay() {
+    if (!asyncStats) return;
+    
+    document.getElementById('queueLength').textContent = asyncStats.queueLength;
+    document.getElementById('activeWorkers').textContent = asyncStats.activeWorkers;
+    document.getElementById('totalProcessed').textContent = asyncStats.totalProcessed.toLocaleString();
+    document.getElementById('totalFailed').textContent = asyncStats.totalFailed.toLocaleString();
+}
+
+// 触发异步任务
+async function triggerAsyncTask() {
+    try {
+        const webhookId = 'test'; // 使用测试webhook ID
+        const priority = 'normal';
+        
+        const response = await fetch('/api/async/trigger', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ webhookId, priority })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('测试任务已触发', 'success');
+            setTimeout(() => refreshAsyncStats(), 1000);
+        } else {
+            showNotification('触发失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('触发异步任务失败:', error);
+        showNotification('触发失败: ' + error.message, 'error');
+    }
+}
+
+// 清空异步队列
+async function clearAsyncQueue() {
+    try {
+        const response = await fetch('/api/async/clear-queue', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('队列已清空', 'success');
+            setTimeout(() => refreshAsyncStats(), 1000);
+        } else {
+            showNotification('清空失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('清空异步队列失败:', error);
+        showNotification('清空失败: ' + error.message, 'error');
+    }
+}
+
+// 加载压缩配置
+async function loadCompressionConfig() {
+    try {
+        const response = await fetch('/api/compression/config');
+        const result = await response.json();
+        
+        if (result.success) {
+            compressionConfig = result.data;
+            
+            document.getElementById('enableCompression').checked = compressionConfig.enabled;
+            document.getElementById('compressionThreshold').value = compressionConfig.threshold;
+            document.getElementById('compressionLevel').value = compressionConfig.level;
+            document.getElementById('windowBits').value = compressionConfig.windowBits;
+            document.getElementById('memLevel').value = compressionConfig.memLevel;
+        }
+    } catch (error) {
+        console.error('加载压缩配置失败:', error);
+        showNotification('加载配置失败', 'error');
+    }
+}
+
+// 保存压缩配置
+async function saveCompressionConfig() {
+    try {
+        const config = {
+            enabled: document.getElementById('enableCompression').checked,
+            threshold: parseInt(document.getElementById('compressionThreshold').value),
+            level: parseInt(document.getElementById('compressionLevel').value),
+            windowBits: parseInt(document.getElementById('windowBits').value),
+            memLevel: parseInt(document.getElementById('memLevel').value)
+        };
+        
+        const response = await fetch('/api/compression/config', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('配置已保存', 'success');
+        } else {
+            showNotification('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存压缩配置失败:', error);
+        showNotification('保存失败: ' + error.message, 'error');
+    }
+}
+
+// 刷新压缩统计
+async function refreshCompressionStats() {
+    try {
+        const response = await fetch('/api/compression/stats');
+        const result = await response.json();
+        
+        if (result.success) {
+            compressionStats = result.data;
+            updateCompressionStatsDisplay();
+        }
+    } catch (error) {
+        console.error('刷新压缩统计失败:', error);
+        showNotification('刷新统计失败', 'error');
+    }
+}
+
+// 更新压缩统计显示
+function updateCompressionStatsDisplay() {
+    if (!compressionStats) return;
+    
+    document.getElementById('totalRequests').textContent = compressionStats.totalRequests.toLocaleString();
+    document.getElementById('compressedRequests').textContent = compressionStats.compressedRequests.toLocaleString();
+    document.getElementById('totalBytesSaved').textContent = compressionStats.totalBytesSavedMB;
+    document.getElementById('averageCompressionRatio').textContent = compressionStats.averageCompressionRatio + '%';
+}
+
+// 测试压缩
+async function testCompression() {
+    try {
+        const testData = document.getElementById('testData').value;
+        const encoding = document.getElementById('compressionEncoding').value;
+        
+        if (!testData.trim()) {
+            showNotification('请输入测试数据', 'warning');
+            return;
+        }
+        
+        const response = await fetch('/api/compression/compress', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ data: testData, encoding })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const resultDiv = document.getElementById('compressionTestResult');
+            const data = result.data;
+            
+            if (data.compressed) {
+                resultDiv.className = 'test-result success';
+                resultDiv.innerHTML = `
+                    <h5>✅ 压缩成功</h5>
+                    <p><strong>原始大小:</strong> ${data.originalSize} bytes</p>
+                    <p><strong>压缩后大小:</strong> ${data.compressedSize} bytes</p>
+                    <p><strong>压缩率:</strong> ${data.ratio}%</p>
+                    <p><strong>节省空间:</strong> ${data.originalSize - data.compressedSize} bytes</p>
+                `;
+            } else {
+                resultDiv.className = 'test-result';
+                resultDiv.innerHTML = `
+                    <h5>ℹ️ 无需压缩</h5>
+                    <p>数据大小 ${data.originalSize} bytes 小于压缩阈值</p>
+                `;
+            }
+        } else {
+            showNotification('测试失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('测试压缩失败:', error);
+        showNotification('测试失败: ' + error.message, 'error');
+    }
+}
+
+// 重置压缩统计
+async function resetCompressionStats() {
+    try {
+        const response = await fetch('/api/compression/reset-stats', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('统计已重置', 'success');
+            setTimeout(() => refreshCompressionStats(), 1000);
+        } else {
+            showNotification('重置失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('重置压缩统计失败:', error);
+        showNotification('重置失败: ' + error.message, 'error');
+    }
+}
+
+// 增强的通知系统
+function showEnhancedNotification(message, type = 'info', duration = 3000) {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type} fade-in-up`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${getNotificationIcon(type)}</span>
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+        </div>
+        <div class="notification-progress"></div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 自动移除
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.classList.add('fade-out');
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, duration);
+    
+    // 进度条动画
+    const progress = notification.querySelector('.notification-progress');
+    progress.style.width = '100%';
+}
+
+// 获取通知图标
+function getNotificationIcon(type) {
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+    return icons[type] || icons.info;
+}
+
+// 初始化数据展示优化
+function initDataDisplayOptimization() {
+    // 初始化图表库
+    initCharts();
+    
+    // 初始化数据导出
+    initDataExport();
+    
+    // 初始化实时更新
+    initRealTimeUpdates();
+}
+
+// 初始化图表库
+function initCharts() {
+    // 检查是否已加载Chart.js
+    if (typeof Chart !== 'undefined') {
+        // 设置Chart.js全局配置
+        Chart.defaults.font.family = 'Arial, sans-serif';
+        Chart.defaults.font.size = 12;
+        Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--text-primary');
+        
+        // 创建Webhook统计图表
+        createWebhookStatsChart();
+        
+        // 创建请求趋势图表
+        createRequestTrendChart();
+    }
+}
+
+// 创建Webhook统计图表
+function createWebhookStatsChart() {
+    const ctx = document.getElementById('webhookStatsChart');
+    if (!ctx) return;
+    
+    const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['活跃', '暂停', '错误'],
+            datasets: [{
+                data: [0, 0, 0],
+                backgroundColor: [
+                    '#4CAF50',
+                    '#FF9800',
+                    '#F44336'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                title: {
+                    display: true,
+                    text: 'Webhook状态统计'
+                }
+            }
+        }
+    });
+    
+    // 保存图表引用
+    window.webhookStatsChart = chart;
+}
+
+// 创建请求趋势图表
+function createRequestTrendChart() {
+    const ctx = document.getElementById('requestTrendChart');
+    if (!ctx) return;
+    
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '请求数量',
+                data: [],
+                borderColor: '#2196F3',
+                backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: '请求趋势'
+                }
+            }
+        }
+    });
+    
+    // 保存图表引用
+    window.requestTrendChart = chart;
+}
+
+// 更新Webhook统计图表
+function updateWebhookStatsChart() {
+    if (!window.webhookStatsChart) return;
+    
+    const webhooks = getWebhooks();
+    const stats = {
+        active: 0,
+        paused: 0,
+        error: 0
+    };
+    
+    webhooks.forEach(webhook => {
+        if (webhook.state === 1) {
+            stats.active++;
+        } else if (webhook.state === 0) {
+            stats.paused++;
+        } else {
+            stats.error++;
+        }
+    });
+    
+    window.webhookStatsChart.data.datasets[0].data = [stats.active, stats.paused, stats.error];
+    window.webhookStatsChart.update();
+}
+
+// 更新请求趋势图表
+function updateRequestTrendChart() {
+    if (!window.requestTrendChart) return;
+    
+    const now = new Date();
+    const labels = [];
+    const data = [];
+    
+    // 生成最近24小时的时间标签
+    for (let i = 23; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+        labels.push(time.getHours() + ':00');
+        
+        // 这里应该从实际数据中获取，暂时使用随机数据
+        data.push(Math.floor(Math.random() * 10));
+    }
+    
+    window.requestTrendChart.data.labels = labels;
+    window.requestTrendChart.data.datasets[0].data = data;
+    window.requestTrendChart.update();
+}
+
+// 初始化数据导出
+function initDataExport() {
+    // 添加导出按钮事件监听
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportData);
+    }
+}
+
+// 导出数据
+function exportData() {
+    const webhooks = getWebhooks();
+    const logs = getLogs();
+    
+    const exportData = {
+        webhooks: webhooks,
+        logs: logs,
+        exportTime: new Date().toISOString(),
+        version: '1.0.0'
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `webhook-data-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    showNotification('数据导出成功', 'success');
+}
+
+// 初始化实时更新
+function initRealTimeUpdates() {
+    // 设置定时器，定期更新图表
+    setInterval(() => {
+        updateWebhookStatsChart();
+        updateRequestTrendChart();
+    }, 30000); // 30秒更新一次
+    
+    // 监听Webhook和日志变化
+    const observer = new MutationObserver(() => {
+        updateWebhookStatsChart();
+    });
+    
+    const webhookList = document.querySelector('.webhook-list');
+    if (webhookList) {
+        observer.observe(webhookList, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
+// 初始化搜索过滤优化
+function initSearchFilterOptimization() {
+    // 初始化搜索建议
+    initSearchSuggestions();
+    
+    // 初始化搜索历史
+    initSearchHistory();
+    
+    // 初始化智能过滤
+    initSmartFiltering();
+}
+
+// 初始化搜索建议
+function initSearchSuggestions() {
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
+    
+    // 创建搜索建议容器
+    const suggestionsContainer = document.createElement('div');
+    suggestionsContainer.id = 'searchSuggestions';
+    suggestionsContainer.className = 'search-suggestions';
+    searchInput.parentNode.appendChild(suggestionsContainer);
+    
+    // 监听输入事件
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length > 0) {
+            showSearchSuggestions(query);
+        } else {
+            hideSearchSuggestions();
+        }
+    });
+    
+    // 监听焦点事件
+    searchInput.addEventListener('focus', function() {
+        if (this.value.trim().length > 0) {
+            showSearchSuggestions(this.value.trim());
+        }
+    });
+    
+    // 监听失焦事件
+    searchInput.addEventListener('blur', function() {
+        setTimeout(hideSearchSuggestions, 200);
+    });
+}
+
+// 显示搜索建议
+function showSearchSuggestions(query) {
+    const suggestionsContainer = document.getElementById('searchSuggestions');
+    if (!suggestionsContainer) return;
+    
+    const suggestions = generateSearchSuggestions(query);
+    if (suggestions.length === 0) {
+        hideSearchSuggestions();
+        return;
+    }
+    
+    suggestionsContainer.innerHTML = suggestions.map(suggestion => `
+        <div class="suggestion-item" onclick="selectSearchSuggestion('${suggestion}')">
+            <span class="suggestion-icon">🔍</span>
+            <span class="suggestion-text">${suggestion}</span>
+        </div>
+    `).join('');
+    
+    suggestionsContainer.style.display = 'block';
+}
+
+// 隐藏搜索建议
+function hideSearchSuggestions() {
+    const suggestionsContainer = document.getElementById('searchSuggestions');
+    if (suggestionsContainer) {
+        suggestionsContainer.style.display = 'none';
+    }
+}
+
+// 生成搜索建议
+function generateSearchSuggestions(query) {
+    const suggestions = [];
+    const webhooks = getWebhooks();
+    const logs = getLogs();
+    
+    // 基于Webhook名称的建议
+    webhooks.forEach(webhook => {
+        if (webhook.name.toLowerCase().includes(query.toLowerCase())) {
+            suggestions.push(`Webhook: ${webhook.name}`);
+        }
+    });
+    
+    // 基于日志内容的建议
+    const uniqueLogs = [...new Set(logs.map(log => log.method))];
+    uniqueLogs.forEach(method => {
+        if (method.toLowerCase().includes(query.toLowerCase())) {
+            suggestions.push(`Method: ${method}`);
+        }
+    });
+    
+    // 基于状态码的建议
+    const uniqueStatusCodes = [...new Set(logs.map(log => log.statusCode))];
+    uniqueStatusCodes.forEach(statusCode => {
+        if (statusCode.toString().includes(query)) {
+            suggestions.push(`Status: ${statusCode}`);
+        }
+    });
+    
+    return suggestions.slice(0, 5); // 最多显示5个建议
+}
+
+// 选择搜索建议
+function selectSearchSuggestion(suggestion) {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        // 提取搜索关键词
+        const colonIndex = suggestion.indexOf(':');
+        if (colonIndex > -1) {
+            searchInput.value = suggestion.substring(colonIndex + 1).trim();
+        } else {
+            searchInput.value = suggestion;
+        }
+        
+        // 触发搜索
+        searchInput.dispatchEvent(new Event('input'));
+        hideSearchSuggestions();
+    }
+}
+
+// 初始化搜索历史
+function initSearchHistory() {
+    // 从本地存储加载搜索历史
+    const savedHistory = localStorage.getItem('webhookSearchHistory');
+    if (savedHistory) {
+        try {
+            searchHistory = JSON.parse(savedHistory);
+        } catch (error) {
+            console.error('解析搜索历史失败:', error);
+            searchHistory = [];
+        }
+    }
+    
+    // 创建搜索历史按钮
+    const searchContainer = document.querySelector('.search-container');
+    if (searchContainer) {
+        const historyBtn = document.createElement('button');
+        historyBtn.id = 'searchHistoryBtn';
+        historyBtn.className = 'btn btn-secondary';
+        historyBtn.innerHTML = '📚 搜索历史';
+        historyBtn.onclick = showSearchHistory;
+        searchContainer.appendChild(historyBtn);
+    }
+}
+
+// 显示搜索历史
+function showSearchHistory() {
+    if (searchHistory.length === 0) {
+        showNotification('暂无搜索历史', 'info');
+        return;
+    }
+    
+    const historyHtml = searchHistory.map((item, index) => `
+        <div class="history-item">
+            <div class="history-info">
+                <span class="history-name">${item.name}</span>
+                <span class="history-time">${new Date(item.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="history-actions">
+                <button class="btn btn-sm btn-primary" onclick="applySearchHistory(${index})">应用</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSearchHistory(${index})">删除</button>
+            </div>
+        </div>
+    `).join('');
+    
+    // 显示历史记录
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📚 搜索历史</h3>
+                <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="search-history-list">
+                    ${historyHtml}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.parentElement.parentElement.remove()">关闭</button>
+                <button class="btn btn-danger" onclick="clearSearchHistory()">清空历史</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// 应用搜索历史
+function applySearchHistory(index) {
+    const historyItem = searchHistory[index];
+    if (historyItem) {
+        // 应用搜索条件
+        if (historyItem.conditions) {
+            advancedSearchConditions = [...historyItem.conditions];
+            renderSearchConditions();
+        }
+        
+        // 应用搜索逻辑
+        if (historyItem.logic) {
+            document.getElementById('conditionLogic').value = historyItem.logic;
+        }
+        
+        // 关闭模态框
+        document.querySelector('.modal').remove();
+        
+        showNotification('搜索历史已应用', 'success');
+    }
+}
+
+// 删除搜索历史
+function deleteSearchHistory(index) {
+    searchHistory.splice(index, 1);
+    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
+    showSearchHistory(); // 刷新显示
+}
+
+// 清空搜索历史
+function clearSearchHistory() {
+    searchHistory = [];
+    localStorage.removeItem('webhookSearchHistory');
+    document.querySelector('.modal').remove();
+    showNotification('搜索历史已清空', 'success');
+}
+
+// 初始化智能过滤
+function initSmartFiltering() {
+    // 创建智能过滤按钮
+    const filterContainer = document.querySelector('.filter-container');
+    if (filterContainer) {
+        const smartFilterBtn = document.createElement('button');
+        smartFilterBtn.id = 'smartFilterBtn';
+        smartFilterBtn.className = 'btn btn-secondary';
+        smartFilterBtn.innerHTML = '🧠 智能过滤';
+        smartFilterBtn.onclick = showSmartFilters;
+        filterContainer.appendChild(smartFilterBtn);
+    }
+}
+
+// 显示智能过滤选项
+function showSmartFilters() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🧠 智能过滤</h3>
+                <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="smart-filter-options">
+                    <div class="filter-option">
+                        <h4>📊 状态过滤</h4>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('status', 'success')">成功请求</button>
+                        <button class="btn btn-sm btn-warning" onclick="applySmartFilter('status', 'error')">错误请求</button>
+                        <button class="btn btn-sm btn-info" onclick="applySmartFilter('status', 'pending')">待处理</button>
+                    </div>
+                    <div class="filter-option">
+                        <h4>⏰ 时间过滤</h4>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('time', 'today')">今天</button>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('time', 'week')">本周</button>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('time', 'month')">本月</button>
+                    </div>
+                    <div class="filter-option">
+                        <h4>🔍 内容过滤</h4>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('content', 'large')">大文件请求</button>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('content', 'json')">JSON请求</button>
+                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('content', 'form')">表单请求</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.parentElement.parentElement.remove()">关闭</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// 应用智能过滤
+function applySmartFilter(type, value) {
+    let filterFunction;
+    
+    switch (type) {
+        case 'status':
+            filterFunction = (log) => {
+                if (value === 'success') return log.statusCode >= 200 && log.statusCode < 300;
+                if (value === 'error') return log.statusCode >= 400;
+                if (value === 'pending') return log.statusCode === 0;
+                return true;
+            };
+            break;
+        case 'time':
+            filterFunction = (log) => {
+                const logTime = new Date(log.timestamp);
+                const now = new Date();
+                if (value === 'today') {
+                    return logTime.toDateString() === now.toDateString();
+                } else if (value === 'week') {
+                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    return logTime >= weekAgo;
+                } else if (value === 'month') {
+                    return logTime.getMonth() === now.getMonth() && logTime.getFullYear() === now.getFullYear();
+                }
+                return true;
+            };
+            break;
+        case 'content':
+            filterFunction = (log) => {
+                if (value === 'large') return log.contentLength > 1024 * 1024; // 1MB
+                if (value === 'json') return log.contentType && log.contentType.includes('json');
+                if (value === 'form') return log.contentType && log.contentType.includes('form');
+                return true;
+            };
+            break;
+    }
+    
+    if (filterFunction) {
+        // 应用过滤
+        const filteredLogs = logs.filter(filterFunction);
+        displayLogs(filteredLogs);
+        
+        // 关闭模态框
+        document.querySelector('.modal').remove();
+        
+        showNotification(`智能过滤已应用: ${type} = ${value}`, 'success');
+    }
 }

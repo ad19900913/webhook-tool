@@ -15,6 +15,10 @@
                 <button id="batchModeBtn" class="btn btn-secondary">📋 批量操作</button>
                 <button id="exportBtn" class="btn btn-secondary">📊 导出Excel</button>
                 <button id="showStatsBtn" class="btn btn-primary">📊 统计图表</button>
+                <button id="dataCleanupBtn" class="btn btn-secondary">🧹 数据清理</button>
+                <button id="memoryOptimizeBtn" class="btn btn-secondary">💾 内存优化</button>
+                <button id="asyncManageBtn" class="btn btn-secondary">⚡ 异步管理</button>
+                <button id="compressionManageBtn" class="btn btn-secondary">📦 压缩管理</button>
                 <button id="themeToggle" class="btn btn-secondary">🌙 暗色主题</button>
                 <button id="securityConfigBtn" class="btn btn-secondary">🔒 安全配置</button>
                 <button id="systemMonitorBtn" class="btn btn-secondary">🖥️ 系统监控</button>
@@ -383,9 +387,391 @@
         </div>
     </div>
 
+    <!-- 数据清理管理模态框 -->
+    <div id="dataCleanupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🧹 数据清理管理</h3>
+                <span class="close" onclick="closeDataCleanupModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="cleanup-overview">
+                    <h4>📊 数据概览</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">总日志数:</span>
+                            <span class="stat-value" id="totalLogsCount">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">总告警数:</span>
+                            <span class="stat-value" id="totalAlertsCount">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Webhook数量:</span>
+                            <span class="stat-value" id="webhookCount">--</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">内存使用:</span>
+                            <span class="stat-value" id="memoryUsage">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cleanup-config">
+                    <h4>⚙️ 清理配置</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableCleanup" checked> 启用自动清理
+                        </label>
+                        <small>定期自动清理过期数据</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cleanupInterval">清理间隔（分钟）:</label>
+                            <input type="number" id="cleanupInterval" value="5" min="1" max="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="maxLogsPerWebhook">每个Webhook最大日志数:</label>
+                            <input type="number" id="maxLogsPerWebhook" value="1000" min="100" max="10000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="maxLogAge">日志保留时间（小时）:</label>
+                            <input type="number" id="maxLogAge" value="24" min="1" max="168">
+                        </div>
+                        <div class="form-group">
+                            <label for="cleanupThreshold">清理阈值:</label>
+                            <input type="number" id="cleanupThreshold" value="0.8" min="0.1" max="1" step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cleanup-actions">
+                    <h4>🔄 清理操作</h4>
+                    <div class="action-buttons">
+                        <button id="triggerCleanupBtn" class="btn btn-primary">🚀 触发清理</button>
+                        <button id="clearAllDataBtn" class="btn btn-danger">🗑️ 清理所有数据</button>
+                        <button id="refreshStatsBtn" class="btn btn-secondary">🔄 刷新统计</button>
+                    </div>
+                </div>
+
+                <div class="cleanup-history">
+                    <h4>📝 清理历史</h4>
+                    <div id="cleanupHistory" class="history-list">
+                        <div class="no-history">暂无清理记录</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDataCleanupModal()">关闭</button>
+                <button id="saveCleanupConfigBtn" class="btn btn-primary">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认清理所有数据的模态框 -->
+    <div id="confirmClearAllModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ 确认操作</h3>
+                <span class="close" onclick="closeConfirmClearAllModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>您确定要清理所有数据吗？</p>
+                <p><strong>此操作将删除：</strong></p>
+                <ul>
+                    <li>所有Webhook日志</li>
+                    <li>所有统计信息</li>
+                    <li>所有告警信息</li>
+                    <li>所有请求计数</li>
+                </ul>
+                <p><strong>⚠️ 此操作不可恢复！</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirmClearAllModal()">取消</button>
+                <button id="confirmClearAllBtn" class="btn btn-danger">确认清理</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 内存优化管理模态框 -->
+    <div id="memoryOptimizeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💾 内存优化管理</h3>
+                <span class="close" onclick="closeMemoryOptimizeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="memory-overview">
+                    <h4>📊 内存概览</h4>
+                    <div class="memory-stats-grid">
+                        <div class="memory-stat-item">
+                            <span class="stat-label">堆内存使用:</span>
+                            <span class="stat-value" id="heapUsedValue">-- MB</span>
+                            <div class="memory-bar">
+                                <div class="memory-bar-fill" id="heapUsedBar"></div>
+                            </div>
+                        </div>
+                        <div class="memory-stat-item">
+                            <span class="stat-label">堆内存总量:</span>
+                            <span class="stat-value" id="heapTotalValue">-- MB</span>
+                        </div>
+                        <div class="memory-stat-item">
+                            <span class="stat-label">RSS内存:</span>
+                            <span class="stat-value" id="rssValue">-- MB</span>
+                        </div>
+                        <div class="memory-stat-item">
+                            <span class="stat-label">外部内存:</span>
+                            <span class="stat-value" id="externalValue">-- MB</span>
+                        </div>
+                    </div>
+                    <div class="memory-warnings" id="memoryWarnings"></div>
+                </div>
+
+                <div class="memory-chart">
+                    <h4>📈 内存使用趋势</h4>
+                    <canvas id="memoryChart" width="400" height="200"></canvas>
+                </div>
+
+                <div class="memory-config">
+                    <h4>⚙️ 优化配置</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableMemoryMonitor" checked> 启用内存监控
+                        </label>
+                        <small>实时监控内存使用情况</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="monitorInterval">监控间隔（秒）:</label>
+                            <input type="number" id="monitorInterval" value="30" min="10" max="300">
+                        </div>
+                        <div class="form-group">
+                            <label for="warningThreshold">警告阈值:</label>
+                            <input type="number" id="warningThreshold" value="0.7" min="0.1" max="1" step="0.1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="criticalThreshold">紧急阈值:</label>
+                            <input type="number" id="criticalThreshold" value="0.9" min="0.1" max="1" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="gcThreshold">垃圾回收阈值:</label>
+                            <input type="number" id="gcThreshold" value="0.8" min="0.1" max="1" step="0.1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableLeakDetection" checked> 启用内存泄漏检测
+                        </label>
+                        <small>检测可能的内存泄漏问题</small>
+                    </div>
+                </div>
+
+                <div class="memory-actions">
+                    <h4>🔄 优化操作</h4>
+                    <div class="action-buttons">
+                        <button id="triggerGcBtn" class="btn btn-primary">🔄 触发垃圾回收</button>
+                        <button id="triggerMonitorBtn" class="btn btn-secondary">📊 触发监控</button>
+                        <button id="emergencyCleanupBtn" class="btn btn-danger">🚨 紧急清理</button>
+                        <button id="refreshMemoryBtn" class="btn btn-secondary">🔄 刷新状态</button>
+                    </div>
+                </div>
+
+                <div class="memory-history">
+                    <h4>📝 操作历史</h4>
+                    <div id="memoryHistory" class="history-list">
+                        <div class="no-history">暂无操作记录</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeMemoryOptimizeModal()">关闭</button>
+                <button id="saveMemoryConfigBtn" class="btn btn-primary">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 异步管理模态框 -->
+    <div id="asyncManageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚡ 异步任务管理</h3>
+                <span class="close" onclick="closeAsyncManageModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="async-overview">
+                    <h4>📊 任务概览</h4>
+                    <div class="async-stats-grid">
+                        <div class="async-stat-item">
+                            <span class="stat-label">队列长度:</span>
+                            <span class="stat-value" id="queueLength">--</span>
+                        </div>
+                        <div class="async-stat-item">
+                            <span class="stat-label">活跃工作线程:</span>
+                            <span class="stat-value" id="activeWorkers">--</span>
+                        </div>
+                        <div class="async-stat-item">
+                            <span class="stat-label">总处理数:</span>
+                            <span class="stat-value" id="totalProcessed">--</span>
+                        </div>
+                        <div class="async-stat-item">
+                            <span class="stat-label">失败数:</span>
+                            <span class="stat-value" id="totalFailed">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="async-config">
+                    <h4>⚙️ 异步配置</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableAsync" checked> 启用异步处理
+                        </label>
+                        <small>使用异步队列处理Webhook请求</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="maxConcurrent">最大并发数:</label>
+                            <input type="number" id="maxConcurrent" value="10" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="queueSize">队列大小:</label>
+                            <input type="number" id="queueSize" value="1000" min="100" max="10000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="retryAttempts">重试次数:</label>
+                            <input type="number" id="retryAttempts" value="3" min="0" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="retryDelay">重试延迟(ms):</label>
+                            <input type="number" id="retryDelay" value="1000" min="100" max="10000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="async-actions">
+                    <h4>🔄 任务操作</h4>
+                    <div class="action-buttons">
+                        <button id="triggerAsyncTaskBtn" class="btn btn-primary">🚀 触发测试任务</button>
+                        <button id="clearQueueBtn" class="btn btn-danger">🗑️ 清空队列</button>
+                        <button id="refreshAsyncStatsBtn" class="btn btn-secondary">🔄 刷新状态</button>
+                    </div>
+                </div>
+
+                <div class="async-queue">
+                    <h4>📋 任务队列</h4>
+                    <div id="asyncQueueList" class="queue-list">
+                        <div class="no-queue">暂无任务</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAsyncManageModal()">关闭</button>
+                <button id="saveAsyncConfigBtn" class="btn btn-primary">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 压缩管理模态框 -->
+    <div id="compressionManageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📦 数据压缩管理</h3>
+                <span class="close" onclick="closeCompressionManageModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="compression-overview">
+                    <h4>📊 压缩概览</h4>
+                    <div class="compression-stats-grid">
+                        <div class="compression-stat-item">
+                            <span class="stat-label">总请求数:</span>
+                            <span class="stat-value" id="totalRequests">--</span>
+                        </div>
+                        <div class="compression-stat-item">
+                            <span class="stat-label">压缩请求数:</span>
+                            <span class="stat-value" id="compressedRequests">--</span>
+                        </div>
+                        <div class="compression-stat-item">
+                            <span class="stat-label">节省空间:</span>
+                            <span class="stat-value" id="totalBytesSaved">-- MB</span>
+                        </div>
+                        <div class="compression-stat-item">
+                            <span class="stat-label">平均压缩率:</span>
+                            <span class="stat-value" id="averageCompressionRatio">--%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="compression-config">
+                    <h4>⚙️ 压缩配置</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableCompression" checked> 启用数据压缩
+                        </label>
+                        <small>压缩请求和响应数据以节省带宽</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="compressionThreshold">压缩阈值(bytes):</label>
+                            <input type="number" id="compressionThreshold" value="1024" min="100" max="10000">
+                        </div>
+                        <div class="form-group">
+                            <label for="compressionLevel">压缩级别:</label>
+                            <input type="number" id="compressionLevel" value="6" min="0" max="9">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="windowBits">窗口大小:</label>
+                            <input type="number" id="windowBits" value="15" min="8" max="15">
+                        </div>
+                        <div class="form-group">
+                            <label for="memLevel">内存级别:</label>
+                            <input type="number" id="memLevel" value="8" min="1" max="9">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="compression-actions">
+                    <h4>🔄 压缩操作</h4>
+                    <div class="action-buttons">
+                        <button id="testCompressionBtn" class="btn btn-primary">🧪 测试压缩</button>
+                        <button id="resetCompressionStatsBtn" class="btn btn-danger">🔄 重置统计</button>
+                        <button id="refreshCompressionStatsBtn" class="btn btn-secondary">🔄 刷新状态</button>
+                    </div>
+                </div>
+
+                <div class="compression-test">
+                    <h4>🧪 压缩测试</h4>
+                    <div class="form-group">
+                        <label for="testData">测试数据:</label>
+                        <textarea id="testData" rows="4" placeholder="输入要测试压缩的数据..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="compressionEncoding">压缩算法:</label>
+                        <select id="compressionEncoding">
+                            <option value="gzip">Gzip</option>
+                            <option value="deflate">Deflate</option>
+                        </select>
+                    </div>
+                    <div id="compressionTestResult" class="test-result"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCompressionManageModal()">关闭</button>
+                <button id="saveCompressionConfigBtn" class="btn btn-primary">保存配置</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
     <script src="script.js"></script>
     
     <!-- 高级搜索模态框 -->
