@@ -17,6 +17,16 @@ let searchFilters = {
 let webhookSearchFilter = ''; // webhook名称搜索过滤器
 let alerts = []; // 存储告警信息
 
+// 高级搜索相关变量
+let advancedSearchConditions = []; // 存储高级搜索条件
+let searchHistory = []; // 存储搜索历史
+let currentAdvancedSearch = null; // 当前应用的高级搜索
+
+// 快速过滤相关变量
+let quickFilters = []; // 存储快速过滤条件
+let savedQuickFilters = []; // 存储已保存的快速过滤
+let currentQuickFilter = null; // 当前应用的快速过滤
+
 // 图表对象
 let successRateChart = null;
 let responseTimeChart = null;
@@ -37,6 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bindEvents();
     startMemoryMonitoring();
     initTheme();
+    loadQuickFilters(); // 加载快速过滤配置
 });
 
 // 测试服务器连接
@@ -148,6 +159,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 绑定安全配置事件
     if (document.getElementById('securityConfigBtn')) {
         document.getElementById('securityConfigBtn').addEventListener('click', openSecurityConfig);
+    }
+    
+    // 绑定系统监控事件
+    if (document.getElementById('systemMonitorBtn')) {
+        document.getElementById('systemMonitorBtn').addEventListener('click', openSystemMonitor);
     }
     if (document.getElementById('saveSecurityConfig')) {
         document.getElementById('saveSecurityConfig').addEventListener('click', saveSecurityConfig);
@@ -311,6 +327,16 @@ function bindEvents() {
         clearLogs();
     });
     
+    // 清除高级搜索按钮
+    document.getElementById('clearAdvancedSearchBtn').addEventListener('click', function() {
+        clearAdvancedSearch();
+    });
+    
+    // 清除快速过滤按钮
+    document.getElementById('clearQuickFilterBtn').addEventListener('click', function() {
+        clearQuickFilter();
+    });
+    
     // 导出日志按钮
     document.getElementById('exportLogsBtn').addEventListener('click', function() {
         exportLogs();
@@ -334,6 +360,11 @@ function bindEvents() {
         webhookSearchFilter = '';
         applyWebhookSearchFilter();
         toggleClearWebhookSearchBtn();
+    });
+    
+    // 高级搜索按钮
+    document.getElementById('advancedSearchBtn').addEventListener('click', function() {
+        openAdvancedSearchModal();
     });
     
     // 时间范围过滤
@@ -391,6 +422,62 @@ function bindEvents() {
     
     document.getElementById('cancelDashboardConfig').addEventListener('click', function() {
         closeDashboardConfig();
+    });
+    
+    // 高级搜索模态框相关事件
+    document.getElementById('saveSearchCondition').addEventListener('click', function() {
+        saveSearchCondition();
+    });
+    
+    document.getElementById('applyAdvancedSearch').addEventListener('click', function() {
+        applyAdvancedSearch();
+    });
+    
+    document.getElementById('resetAdvancedSearch').addEventListener('click', function() {
+        resetAdvancedSearch();
+    });
+    
+    document.getElementById('cancelAdvancedSearch').addEventListener('click', function() {
+        closeAdvancedSearchModal();
+    });
+    
+    document.getElementById('addSearchCondition').addEventListener('click', function() {
+        addSearchCondition();
+    });
+    
+    document.getElementById('clearSearchHistory').addEventListener('click', function() {
+        clearSearchHistory();
+    });
+    
+    // 高级搜索相关控件事件
+    document.getElementById('enableRegexSearch').addEventListener('change', function() {
+        toggleRegexHelp();
+    });
+    
+    // 快速过滤按钮
+    document.getElementById('quickFilterBtn').addEventListener('click', function() {
+        openQuickFilterModal();
+    });
+    
+    // 快速过滤模态框相关事件
+    document.getElementById('applyQuickFilter').addEventListener('click', function() {
+        applyQuickFilter();
+    });
+    
+    document.getElementById('clearQuickFilter').addEventListener('click', function() {
+        clearQuickFilter();
+    });
+    
+    document.getElementById('cancelQuickFilter').addEventListener('click', function() {
+        closeQuickFilterModal();
+    });
+    
+    document.getElementById('addCustomFilter').addEventListener('click', function() {
+        addCustomFilter();
+    });
+    
+    document.getElementById('searchOperator').addEventListener('change', function() {
+        updateSearchOperator();
     });
 }
 
@@ -706,6 +793,18 @@ async function loadLogsForWebhook() {
         allLogs = data.logs || [];
         currentTypeStats = data.typeStats || {};
         
+        // 清除高级搜索状态
+        if (currentAdvancedSearch) {
+            currentAdvancedSearch = null;
+            document.getElementById('clearAdvancedSearchBtn').style.display = 'none';
+        }
+        
+        // 清除快速过滤状态
+        if (currentQuickFilter) {
+            currentQuickFilter = null;
+            document.getElementById('clearQuickFilterBtn').style.display = 'none';
+        }
+        
         applySearchFilters();
         updateMessageTypeFilter();
         updateTypeStatsDisplay();
@@ -729,6 +828,18 @@ async function loadLogsForWebhook() {
 
 // 应用搜索过滤器
 function applySearchFilters() {
+    // 清除高级搜索状态
+    if (currentAdvancedSearch) {
+        currentAdvancedSearch = null;
+        document.getElementById('clearAdvancedSearchBtn').style.display = 'none';
+    }
+    
+    // 清除快速过滤状态
+    if (currentQuickFilter) {
+        currentQuickFilter = null;
+        document.getElementById('clearQuickFilterBtn').style.display = 'none';
+    }
+    
     logs = allLogs.filter(log => {
         // 检查 tenantId 搜索
         if (searchFilters.tenantId) {
@@ -3470,3 +3581,803 @@ document.addEventListener('DOMContentLoaded', function() {
     // 启动操作引导
     setTimeout(startTour, 2000);
 });
+
+// ==================== 高级搜索功能 ====================
+
+// 打开高级搜索模态框
+function openAdvancedSearchModal() {
+    document.getElementById('advancedSearchModal').style.display = 'block';
+    loadSearchHistory();
+    initializeAdvancedSearch();
+}
+
+// 关闭高级搜索模态框
+function closeAdvancedSearchModal() {
+    document.getElementById('advancedSearchModal').style.display = 'none';
+    resetAdvancedSearch();
+}
+
+// 初始化高级搜索
+function initializeAdvancedSearch() {
+    // 重置搜索条件
+    advancedSearchConditions = [];
+    
+    // 添加第一个搜索条件
+    addSearchCondition();
+    
+    // 重置表单
+    document.getElementById('searchField').value = 'all';
+    document.getElementById('searchValue').value = '';
+    document.getElementById('searchOperator').value = 'contains';
+    document.getElementById('caseSensitive').checked = false;
+    document.getElementById('enableRegexSearch').checked = false;
+    document.getElementById('conditionLogic').value = 'AND';
+    
+    // 隐藏正则表达式帮助
+    document.getElementById('regexHelp').style.display = 'none';
+}
+
+// 添加搜索条件
+function addSearchCondition() {
+    const conditionId = Date.now() + Math.random();
+    const condition = {
+        id: conditionId,
+        field: 'all',
+        value: '',
+        operator: 'contains',
+        caseSensitive: false
+    };
+    
+    advancedSearchConditions.push(condition);
+    renderSearchConditions();
+}
+
+// 渲染搜索条件
+function renderSearchConditions() {
+    const container = document.getElementById('searchConditions');
+    container.innerHTML = '';
+    
+    advancedSearchConditions.forEach((condition, index) => {
+        const conditionElement = createSearchConditionElement(condition, index);
+        container.appendChild(conditionElement);
+    });
+}
+
+// 创建搜索条件元素
+function createSearchConditionElement(condition, index) {
+    const div = document.createElement('div');
+    div.className = 'search-condition';
+    div.innerHTML = `
+        <div class="search-condition-header">
+            <span class="search-condition-title">条件 ${index + 1}</span>
+            <button class="remove-condition" onclick="removeSearchCondition(${condition.id})" title="删除条件">×</button>
+        </div>
+        <div class="search-condition-fields">
+            <div class="form-group">
+                <label>字段：</label>
+                <select onchange="updateSearchCondition(${condition.id}, 'field', this.value)">
+                    <option value="all" ${condition.field === 'all' ? 'selected' : ''}>所有字段</option>
+                    <option value="tenantId" ${condition.field === 'tenantId' ? 'selected' : ''}>Tenant ID</option>
+                    <option value="uniqueId" ${condition.field === 'uniqueId' ? 'selected' : ''}>Unique ID</option>
+                    <option value="url" ${condition.field === 'url' ? 'selected' : ''}>请求URL</option>
+                    <option value="method" ${condition.field === 'method' ? 'selected' : ''}>请求方法</option>
+                    <option value="status" ${condition.field === 'status' ? 'selected' : ''}>响应状态</option>
+                    <option value="ip" ${condition.field === 'ip' ? 'selected' : ''}>客户端IP</option>
+                    <option value="userAgent" ${condition.field === 'userAgent' ? 'selected' : ''}>User-Agent</option>
+                    <option value="body" ${condition.field === 'body' ? 'selected' : ''}>请求体内容</option>
+                    <option value="headers" ${condition.field === 'headers' ? 'selected' : ''}>请求头</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>操作符：</label>
+                <select onchange="updateSearchCondition(${condition.id}, 'operator', this.value)">
+                    <option value="contains" ${condition.operator === 'contains' ? 'selected' : ''}>包含</option>
+                    <option value="equals" ${condition.operator === 'equals' ? 'selected' : ''}>等于</option>
+                    <option value="startsWith" ${condition.operator === 'startsWith' ? 'selected' : ''}>开头是</option>
+                    <option value="endsWith" ${condition.operator === 'endsWith' ? 'selected' : ''}>结尾是</option>
+                    <option value="regex" ${condition.operator === 'regex' ? 'selected' : ''}>正则匹配</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>搜索值：</label>
+            <input type="text" value="${condition.value}" 
+                   onchange="updateSearchCondition(${condition.id}, 'value', this.value)"
+                   placeholder="输入搜索关键词或正则表达式">
+        </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" ${condition.caseSensitive ? 'checked' : ''}
+                       onchange="updateSearchCondition(${condition.id}, 'caseSensitive', this.checked)">
+                区分大小写
+            </label>
+        </div>
+    `;
+    
+    return div;
+}
+
+// 更新搜索条件
+function updateSearchCondition(conditionId, field, value) {
+    const condition = advancedSearchConditions.find(c => c.id === conditionId);
+    if (condition) {
+        condition[field] = value;
+    }
+}
+
+// 删除搜索条件
+function removeSearchCondition(conditionId) {
+    advancedSearchConditions = advancedSearchConditions.filter(c => c.id !== conditionId);
+    renderSearchConditions();
+}
+
+// 切换正则表达式帮助
+function toggleRegexHelp() {
+    const enableRegex = document.getElementById('enableRegexSearch').checked;
+    const regexHelp = document.getElementById('regexHelp');
+    regexHelp.style.display = enableRegex ? 'block' : 'none';
+}
+
+// 更新搜索操作符
+function updateSearchOperator() {
+    const operator = document.getElementById('searchOperator').value;
+    const regexHelp = document.getElementById('regexHelp');
+    regexHelp.style.display = operator === 'regex' ? 'block' : 'none';
+}
+
+// 应用高级搜索
+function applyAdvancedSearch() {
+    if (advancedSearchConditions.length === 0) {
+        showNotification('请至少添加一个搜索条件', 'warning');
+        return;
+    }
+    
+    // 验证搜索条件
+    for (const condition of advancedSearchConditions) {
+        if (!condition.value.trim()) {
+            showNotification(`条件 ${advancedSearchConditions.indexOf(condition) + 1} 的搜索值不能为空`, 'warning');
+            return;
+        }
+    }
+    
+    // 保存当前搜索
+    const searchName = `高级搜索_${new Date().toLocaleString()}`;
+    const searchConfig = {
+        name: searchName,
+        conditions: [...advancedSearchConditions],
+        logic: document.getElementById('conditionLogic').value,
+        timestamp: Date.now()
+    };
+    
+    // 添加到搜索历史
+    searchHistory.unshift(searchConfig);
+    if (searchHistory.length > 20) {
+        searchHistory.pop(); // 最多保存20条搜索历史
+    }
+    
+    // 保存到本地存储
+    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
+    
+    // 应用搜索
+    currentAdvancedSearch = searchConfig;
+    applyAdvancedSearchToLogs();
+    
+    // 关闭模态框
+    closeAdvancedSearchModal();
+    
+    showNotification('高级搜索已应用', 'success');
+}
+
+// 应用高级搜索到日志
+function applyAdvancedSearchToLogs() {
+    if (!currentAdvancedSearch) return;
+    
+    const { conditions, logic } = currentAdvancedSearch;
+    
+    logs = allLogs.filter(log => {
+        if (logic === 'AND') {
+            // 所有条件都必须满足
+            return conditions.every(condition => evaluateSearchCondition(log, condition));
+        } else {
+            // 任一条件满足即可
+            return conditions.some(condition => evaluateSearchCondition(log, condition));
+        }
+    });
+    
+    renderLogs();
+    updateSearchResultInfo();
+    
+    // 显示清除高级搜索按钮
+    document.getElementById('clearAdvancedSearchBtn').style.display = 'inline-block';
+}
+
+// 评估搜索条件
+function evaluateSearchCondition(log, condition) {
+    const { field, value, operator, caseSensitive } = condition;
+    const searchValue = value.trim();
+    
+    if (!searchValue) return true;
+    
+    let fieldValue = '';
+    
+    // 根据字段获取值
+    if (field === 'all') {
+        // 搜索所有字段
+        fieldValue = JSON.stringify(log).toLowerCase();
+    } else if (field === 'tenantId') {
+        fieldValue = extractFieldFromLog(log, 'tenantId') || '';
+    } else if (field === 'uniqueId') {
+        fieldValue = extractFieldFromLog(log, 'uniqueId') || '';
+    } else if (field === 'url') {
+        fieldValue = log.url || '';
+    } else if (field === 'method') {
+        fieldValue = log.method || '';
+    } else if (field === 'status') {
+        fieldValue = log.status || '';
+    } else if (field === 'ip') {
+        fieldValue = log.ip || '';
+    } else if (field === 'userAgent') {
+        fieldValue = log.userAgent || '';
+    } else if (field === 'body') {
+        fieldValue = JSON.stringify(log.body || {});
+    } else if (field === 'headers') {
+        fieldValue = JSON.stringify(log.headers || {});
+    }
+    
+    // 转换为字符串
+    fieldValue = String(fieldValue);
+    
+    // 根据操作符进行匹配
+    if (operator === 'regex') {
+        try {
+            const flags = caseSensitive ? 'g' : 'gi';
+            const regex = new RegExp(searchValue, flags);
+            return regex.test(fieldValue);
+        } catch (error) {
+            console.error('正则表达式错误:', error);
+            return false;
+        }
+    } else {
+        // 非正则表达式搜索
+        if (!caseSensitive) {
+            fieldValue = fieldValue.toLowerCase();
+            searchValue = searchValue.toLowerCase();
+        }
+        
+        switch (operator) {
+            case 'contains':
+                return fieldValue.includes(searchValue);
+            case 'equals':
+                return fieldValue === searchValue;
+            case 'startsWith':
+                return fieldValue.startsWith(searchValue);
+            case 'endsWith':
+                return fieldValue.endsWith(searchValue);
+            default:
+                return fieldValue.includes(searchValue);
+        }
+    }
+}
+
+// 保存搜索条件
+function saveSearchCondition() {
+    const name = prompt('请输入搜索条件名称：');
+    if (!name) return;
+    
+    const searchConfig = {
+        name: name,
+        conditions: [...advancedSearchConditions],
+        logic: document.getElementById('conditionLogic').value,
+        timestamp: Date.now()
+    };
+    
+    // 添加到搜索历史
+    searchHistory.unshift(searchConfig);
+    if (searchHistory.length > 20) {
+        searchHistory.pop();
+    }
+    
+    // 保存到本地存储
+    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
+    
+    showNotification('搜索条件已保存', 'success');
+    loadSearchHistory();
+}
+
+// 重置高级搜索
+function resetAdvancedSearch() {
+    advancedSearchConditions = [];
+    renderSearchConditions();
+    document.getElementById('searchField').value = 'all';
+    document.getElementById('searchValue').value = '';
+    document.getElementById('searchOperator').value = 'contains';
+    document.getElementById('caseSensitive').checked = false;
+    document.getElementById('enableRegexSearch').checked = false;
+    document.getElementById('conditionLogic').value = 'AND';
+    document.getElementById('regexHelp').style.display = 'none';
+}
+
+// 加载搜索历史
+function loadSearchHistory() {
+    try {
+        const saved = localStorage.getItem('webhookSearchHistory');
+        if (saved) {
+            searchHistory = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('加载搜索历史失败:', error);
+        searchHistory = [];
+    }
+    
+    renderSearchHistory();
+}
+
+// 渲染搜索历史
+function renderSearchHistory() {
+    const container = document.getElementById('searchHistory');
+    
+    if (searchHistory.length === 0) {
+        container.innerHTML = '<div class="no-history">暂无搜索历史</div>';
+        return;
+    }
+    
+    container.innerHTML = searchHistory.map((item, index) => `
+        <div class="search-history-item" onclick="loadSearchFromHistory(${index})">
+            <div class="history-name">${item.name}</div>
+            <div class="history-details">
+                条件数: ${item.conditions.length} | 
+                逻辑: ${item.logic} | 
+                时间: ${new Date(item.timestamp).toLocaleString()}
+            </div>
+            <div class="history-actions">
+                <button onclick="event.stopPropagation(); deleteSearchHistory(${index})" class="btn btn-small btn-danger">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 从历史记录加载搜索
+function loadSearchFromHistory(index) {
+    const searchConfig = searchHistory[index];
+    if (!searchConfig) return;
+    
+    // 加载搜索条件
+    advancedSearchConditions = [...searchConfig.conditions];
+    renderSearchConditions();
+    
+    // 设置逻辑
+    document.getElementById('conditionLogic').value = searchConfig.logic;
+    
+    showNotification('已加载搜索条件', 'info');
+}
+
+// 删除搜索历史
+function deleteSearchHistory(index) {
+    searchHistory.splice(index, 1);
+    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
+    renderSearchHistory();
+    showNotification('搜索历史已删除', 'success');
+}
+
+// 清空搜索历史
+function clearSearchHistory() {
+    if (confirm('确定要清空所有搜索历史吗？')) {
+        searchHistory = [];
+        localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
+        renderSearchHistory();
+        showNotification('搜索历史已清空', 'success');
+    }
+}
+
+// 清除当前高级搜索
+function clearAdvancedSearch() {
+    currentAdvancedSearch = null;
+    logs = [...allLogs];
+    renderLogs();
+    updateSearchResultInfo();
+    
+    // 隐藏清除高级搜索按钮
+    document.getElementById('clearAdvancedSearchBtn').style.display = 'none';
+    
+    showNotification('已清除高级搜索', 'info');
+}
+
+// ==================== 快速过滤功能 ====================
+
+// 打开快速过滤模态框
+function openQuickFilterModal() {
+    document.getElementById('quickFilterModal').style.display = 'block';
+    loadSavedQuickFilters();
+    initializeQuickFilters();
+}
+
+// 关闭快速过滤模态框
+function closeQuickFilterModal() {
+    document.getElementById('quickFilterModal').style.display = 'none';
+    resetQuickFilterSelection();
+}
+
+// 初始化快速过滤
+function initializeQuickFilters() {
+    // 清除之前的选择
+    resetQuickFilterSelection();
+    
+    // 绑定快速过滤项点击事件
+    document.querySelectorAll('.quick-filter-item').forEach(item => {
+        item.addEventListener('click', function() {
+            toggleQuickFilterSelection(this);
+        });
+    });
+}
+
+// 重置快速过滤选择
+function resetQuickFilterSelection() {
+    document.querySelectorAll('.quick-filter-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    quickFilters = [];
+}
+
+// 切换快速过滤选择
+function toggleQuickFilterSelection(element) {
+    const filterType = element.dataset.filter;
+    
+    if (element.classList.contains('selected')) {
+        // 取消选择
+        element.classList.remove('selected');
+        quickFilters = quickFilters.filter(f => f.type !== filterType);
+    } else {
+        // 选择
+        element.classList.add('selected');
+        quickFilters.push({
+            type: filterType,
+            name: element.querySelector('.filter-title').textContent,
+            description: element.querySelector('.filter-desc').textContent
+        });
+    }
+}
+
+// 应用快速过滤
+function applyQuickFilter() {
+    if (quickFilters.length === 0) {
+        showNotification('请选择至少一个过滤条件', 'warning');
+        return;
+    }
+    
+    // 保存当前过滤到历史
+    saveQuickFilterToHistory();
+    
+    // 应用过滤到日志
+    applyQuickFilterToLogs();
+    
+    // 关闭模态框
+    closeQuickFilterModal();
+    
+    showNotification(`已应用 ${quickFilters.length} 个快速过滤条件`, 'success');
+}
+
+// 应用快速过滤到日志
+function applyQuickFilterToLogs() {
+    if (quickFilters.length === 0) return;
+    
+    // 保存当前过滤状态
+    currentQuickFilter = [...quickFilters];
+    
+    // 过滤日志
+    logs = allLogs.filter(log => {
+        return quickFilters.every(filter => {
+            return evaluateQuickFilter(log, filter);
+        });
+    });
+    
+    // 渲染过滤后的日志
+    renderLogs();
+    updateSearchResultInfo();
+    
+    // 显示清除快速过滤按钮
+    document.getElementById('clearQuickFilterBtn').style.display = 'inline-block';
+}
+
+// 评估快速过滤条件
+function evaluateQuickFilter(log, filter) {
+    switch (filter.type) {
+        case 'success':
+            return log.status >= 200 && log.status < 300;
+        case 'error':
+            return log.status >= 400 && log.status < 600;
+        case 'timeout':
+            return log.responseTime > 5000; // 5秒
+        case 'recent':
+            const oneHourAgo = Date.now() - (60 * 60 * 1000);
+            return log.timestamp > oneHourAgo;
+        case 'mobile':
+            return log.headers && log.headers['user-agent'] && 
+                   log.headers['user-agent'].toLowerCase().includes('mobile');
+        case 'bot':
+            return log.headers && log.headers['user-agent'] && 
+                   log.headers['user-agent'].toLowerCase().includes('bot');
+        case 'api':
+            return log.headers && log.headers['content-type'] && 
+                   log.headers['content-type'].toLowerCase().includes('json');
+        case 'large':
+            return log.body && log.body.length > 1024 * 1024; // 1MB
+        default:
+            return true;
+    }
+}
+
+// 清除快速过滤
+function clearQuickFilter() {
+    currentQuickFilter = null;
+    logs = [...allLogs];
+    renderLogs();
+    updateSearchResultInfo();
+    
+    // 隐藏清除快速过滤按钮
+    document.getElementById('clearQuickFilterBtn').style.display = 'none';
+    
+    showNotification('已清除快速过滤', 'info');
+}
+
+// 添加自定义过滤
+function addCustomFilter() {
+    const name = document.getElementById('customFilterName').value.trim();
+    const condition = document.getElementById('customFilterCondition').value.trim();
+    
+    if (!name || !condition) {
+        showNotification('请填写过滤名称和条件', 'warning');
+        return;
+    }
+    
+    // 验证条件格式
+    if (!validateCustomFilterCondition(condition)) {
+        showNotification('过滤条件格式不正确', 'error');
+        return;
+    }
+    
+    // 添加到已保存的快速过滤
+    const customFilter = {
+        name: name,
+        condition: condition,
+        timestamp: Date.now()
+    };
+    
+    savedQuickFilters.push(customFilter);
+    localStorage.setItem('webhookQuickFilters', JSON.stringify(savedQuickFilters));
+    
+    // 清空表单
+    document.getElementById('customFilterName').value = '';
+    document.getElementById('customFilterCondition').value = '';
+    
+    // 重新渲染
+    renderSavedQuickFilters();
+    
+    showNotification('自定义过滤已添加', 'success');
+}
+
+// 验证自定义过滤条件
+function validateCustomFilterCondition(condition) {
+    // 简单的条件格式验证
+    const validOperators = ['=', '!=', '>', '<', '>=', '<=', 'contains', 'startsWith', 'endsWith'];
+    const hasValidOperator = validOperators.some(op => condition.includes(op));
+    
+    return hasValidOperator && condition.includes('AND') || condition.includes('OR') || !condition.includes('AND') && !condition.includes('OR');
+}
+
+// 保存快速过滤到历史
+function saveQuickFilterToHistory() {
+    const filterHistory = {
+        filters: [...quickFilters],
+        timestamp: Date.now()
+    };
+    
+    // 从localStorage加载历史
+    let history = [];
+    try {
+        const saved = localStorage.getItem('webhookQuickFilterHistory');
+        if (saved) {
+            history = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('加载快速过滤历史失败:', error);
+    }
+    
+    // 添加到历史开头
+    history.unshift(filterHistory);
+    
+    // 只保留最近20条记录
+    if (history.length > 20) {
+        history = history.slice(0, 20);
+    }
+    
+    // 保存到localStorage
+    localStorage.setItem('webhookQuickFilterHistory', JSON.stringify(history));
+}
+
+// 加载已保存的快速过滤
+function loadQuickFilters() {
+    try {
+        const saved = localStorage.getItem('webhookQuickFilters');
+        if (saved) {
+            savedQuickFilters = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('加载快速过滤失败:', error);
+        savedQuickFilters = [];
+    }
+}
+
+// 加载已保存的快速过滤到界面
+function loadSavedQuickFilters() {
+    loadQuickFilters();
+    renderSavedQuickFilters();
+}
+
+// 渲染已保存的快速过滤
+function renderSavedQuickFilters() {
+    const container = document.getElementById('savedQuickFilters');
+    
+    if (savedQuickFilters.length === 0) {
+        container.innerHTML = '<div class="no-filters">暂无已保存的快速过滤</div>';
+        return;
+    }
+    
+    container.innerHTML = savedQuickFilters.map((filter, index) => `
+        <div class="saved-filter-item">
+            <div class="filter-name">${filter.name}</div>
+            <div class="filter-condition">${filter.condition}</div>
+            <div class="filter-actions">
+                <button onclick="applySavedQuickFilter(${index})" class="btn btn-small btn-primary">应用</button>
+                <button onclick="deleteSavedQuickFilter(${index})" class="btn btn-small btn-danger">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 应用已保存的快速过滤
+function applySavedQuickFilter(index) {
+    const filter = savedQuickFilters[index];
+    if (!filter) return;
+    
+    // 解析自定义条件并应用
+    try {
+        const parsedCondition = parseCustomFilterCondition(filter.condition);
+        if (parsedCondition) {
+            // 应用自定义过滤
+            applyCustomFilterCondition(parsedCondition);
+            closeQuickFilterModal();
+            showNotification(`已应用自定义过滤: ${filter.name}`, 'success');
+        }
+    } catch (error) {
+        console.error('应用自定义过滤失败:', error);
+        showNotification('应用自定义过滤失败', 'error');
+    }
+}
+
+// 删除已保存的快速过滤
+function deleteSavedQuickFilter(index) {
+    if (confirm('确定要删除这个快速过滤吗？')) {
+        savedQuickFilters.splice(index, 1);
+        localStorage.setItem('webhookQuickFilters', JSON.stringify(savedQuickFilters));
+        renderSavedQuickFilters();
+        showNotification('快速过滤已删除', 'success');
+    }
+}
+
+// 解析自定义过滤条件
+function parseCustomFilterCondition(condition) {
+    // 简单的条件解析器
+    // 支持格式: field = value AND field2 != value2 OR field3 > value3
+    try {
+        const parts = condition.split(/\s+(AND|OR)\s+/i);
+        const result = {
+            conditions: [],
+            logic: 'AND'
+        };
+        
+        for (let i = 0; i < parts.length; i++) {
+            if (parts[i].toUpperCase() === 'AND' || parts[i].toUpperCase() === 'OR') {
+                result.logic = parts[i].toUpperCase();
+            } else if (parts[i].trim()) {
+                const conditionPart = parts[i].trim();
+                const match = conditionPart.match(/(\w+)\s*([=!<>]=?|contains|startsWith|endsWith)\s*(.+)/);
+                if (match) {
+                    result.conditions.push({
+                        field: match[1],
+                        operator: match[2],
+                        value: match[3].replace(/['"]/g, '')
+                    });
+                }
+            }
+        }
+        
+        return result.conditions.length > 0 ? result : null;
+    } catch (error) {
+        console.error('解析自定义过滤条件失败:', error);
+        return null;
+    }
+}
+
+// 应用自定义过滤条件
+function applyCustomFilterCondition(parsedCondition) {
+    if (!parsedCondition || !parsedCondition.conditions) return;
+    
+    // 过滤日志
+    logs = allLogs.filter(log => {
+        return parsedCondition.conditions.every(condition => {
+            return evaluateCustomFilterCondition(log, condition);
+        });
+    });
+    
+    // 渲染过滤后的日志
+    renderLogs();
+    updateSearchResultInfo();
+    
+    // 显示清除快速过滤按钮
+    document.getElementById('clearQuickFilterBtn').style.display = 'inline-block';
+}
+
+// 评估自定义过滤条件
+function evaluateCustomFilterCondition(log, condition) {
+    const field = condition.field;
+    const operator = condition.operator;
+    const value = condition.value;
+    
+    let fieldValue;
+    
+    // 获取字段值
+    switch (field.toLowerCase()) {
+        case 'tenantid':
+            fieldValue = log.tenantId;
+            break;
+        case 'uniqueid':
+            fieldValue = log.uniqueId;
+            break;
+        case 'status':
+            fieldValue = log.status;
+            break;
+        case 'method':
+            fieldValue = log.method;
+            break;
+        case 'url':
+            fieldValue = log.url;
+            break;
+        case 'ip':
+            fieldValue = log.ip;
+            break;
+        case 'responseTime':
+            fieldValue = log.responseTime;
+            break;
+        default:
+            fieldValue = '';
+    }
+    
+    // 根据操作符进行比较
+    switch (operator) {
+        case '=':
+            return fieldValue == value;
+        case '!=':
+            return fieldValue != value;
+        case '>':
+            return fieldValue > value;
+        case '<':
+            return fieldValue < value;
+        case '>=':
+            return fieldValue >= value;
+        case '<=':
+            return fieldValue <= value;
+        case 'contains':
+            return String(fieldValue).toLowerCase().includes(value.toLowerCase());
+        case 'startsWith':
+            return String(fieldValue).toLowerCase().startsWith(value.toLowerCase());
+        case 'endsWith':
+            return String(fieldValue).toLowerCase().endsWith(value.toLowerCase());
+        default:
+            return true;
+    }
+}
+
+// 打开系统监控页面
+function openSystemMonitor() {
+    window.open('system-monitor.html', '_blank');
+}

@@ -1,0 +1,58 @@
+{
+  "server": {
+    "port": 3001,
+    "host": "localhost",
+    "timeout": 10000,
+    "maxBodySize": "10mb"
+  },
+  "webhook": {
+    "maxPayloadSize": "1mb",
+    "rateLimit": {
+      "windowMs": 60000,
+      "max": 1000,
+      "message": "请求过于频繁，请稍后再试"
+    },
+    "security": {
+      "enableIpWhitelist": false,
+      "ipWhitelist": [],
+      "enableSignature": false,
+      "signatureSecret": "test-secret-key",
+      "enableRateLimit": false
+    }
+  },
+  "logging": {
+    "level": "error",
+    "maxSize": "10mb",
+    "maxFiles": 1,
+    "retentionDays": 1,
+    "format": "test"
+  },
+  "storage": {
+    "type": "memory",
+    "maxLogs": 1000,
+    "cleanupInterval": 300000
+  },
+  "monitoring": {
+    "enableMetrics": false,
+    "metricsPath": "/metrics",
+    "healthCheckPath": "/health",
+    "enableHealthCheck": true
+  },
+  "ui": {
+    "theme": "light",
+    "language": "en-US",
+    "pageSize": 10,
+    "autoRefresh": false,
+    "refreshInterval": 60000
+  },
+  "export": {
+    "maxRecords": 1000,
+    "formats": ["json"],
+    "defaultFormat": "json"
+  },
+  "test": {
+    "enableMockData": true,
+    "enableTestEndpoints": true,
+    "mockDataSize": 100
+  }
+}

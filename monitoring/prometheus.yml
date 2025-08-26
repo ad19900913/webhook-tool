@@ -1,0 +1,113 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Webhook工具监控
+  - job_name: 'webhook-tool'
+    static_configs:
+      - targets: ['webhook-tool:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Nginx监控
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: '/nginx_status'
+    scrape_interval: 15s
+
+  # Redis监控
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-master:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # 系统监控
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# 告警规则
+groups:
+  - name: webhook-tool
+    rules:
+      - alert: WebhookToolDown
+        expr: up{job="webhook-tool"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Webhook工具服务不可用"
+          description: "Webhook工具服务已经停止响应超过1分钟"
+
+      - alert: HighResponseTime
+        expr: http_request_duration_seconds{job="webhook-tool"} > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook工具响应时间过高"
+          description: "Webhook工具响应时间超过2秒"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{job="webhook-tool", status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook工具错误率过高"
+          description: "Webhook工具5xx错误率超过10%"
+
+  - name: nginx
+    rules:
+      - alert: NginxDown
+        expr: up{job="nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx服务不可用"
+          description: "Nginx服务已经停止响应超过1分钟"
+
+      - alert: HighNginxErrorRate
+        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx错误率过高"
+          description: "Nginx 5xx错误率超过10%"
+
+  - name: redis
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis服务不可用"
+          description: "Redis服务已经停止响应超过1分钟"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis内存使用率过高"
+          description: "Redis内存使用率超过80%"

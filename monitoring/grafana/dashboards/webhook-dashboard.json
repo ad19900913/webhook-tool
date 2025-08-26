@@ -1,0 +1,143 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Webhook工具监控仪表板",
+    "tags": ["webhook", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "服务状态概览",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"webhook-tool\"}",
+            "legendFormat": "Webhook工具"
+          },
+          {
+            "expr": "up{job=\"nginx\"}",
+            "legendFormat": "Nginx"
+          },
+          {
+            "expr": "up{job=\"redis\"}",
+            "legendFormat": "Redis"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "请求响应时间",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_request_duration_seconds_sum{job=\"webhook-tool\"}[5m]) / rate(http_request_duration_seconds_count{job=\"webhook-tool\"}[5m])",
+            "legendFormat": "平均响应时间"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "响应时间 (秒)",
+            "unit": "s"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "请求量趋势",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"webhook-tool\"}[5m])",
+            "legendFormat": "请求量/秒"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "请求量/秒",
+            "unit": "reqps"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "错误率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"webhook-tool\", status=~\"4..|5..\"}[5m]) / rate(http_requests_total{job=\"webhook-tool\"}[5m]) * 100",
+            "legendFormat": "错误率 (%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "错误率 (%)",
+            "unit": "percent"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Redis内存使用",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes{job=\"redis\"} / 1024 / 1024",
+            "legendFormat": "内存使用 (MB)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "内存使用 (MB)",
+            "unit": "bytes"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "系统资源使用",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU使用率 (%)"
+          },
+          {
+            "expr": "100 - (avg by (instance) (node_memory_MemAvailable_bytes) / avg by (instance) (node_memory_MemTotal_bytes) * 100)",
+            "legendFormat": "内存使用率 (%)"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "使用率 (%)",
+            "unit": "percent"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

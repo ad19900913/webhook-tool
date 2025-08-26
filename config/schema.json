@@ -1,0 +1,271 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Webhook工具配置模式",
+  "description": "Webhook工具的配置文件验证模式",
+  "type": "object",
+  "properties": {
+    "server": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 3000,
+          "description": "服务器监听端口"
+        },
+        "host": {
+          "type": "string",
+          "default": "0.0.0.0",
+          "description": "服务器绑定地址"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 300000,
+          "default": 30000,
+          "description": "请求超时时间（毫秒）"
+        },
+        "maxBodySize": {
+          "type": "string",
+          "pattern": "^\\d+\\s*(kb|mb|gb)?$",
+          "default": "100mb",
+          "description": "最大请求体大小"
+        }
+      },
+      "required": ["port", "host"],
+      "additionalProperties": false
+    },
+    "webhook": {
+      "type": "object",
+      "properties": {
+        "maxPayloadSize": {
+          "type": "string",
+          "pattern": "^\\d+\\s*(kb|mb|gb)?$",
+          "default": "10mb",
+          "description": "Webhook最大负载大小"
+        },
+        "rateLimit": {
+          "type": "object",
+          "properties": {
+            "windowMs": {
+              "type": "integer",
+              "minimum": 1000,
+              "default": 900000,
+              "description": "限流时间窗口（毫秒）"
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100,
+              "description": "最大请求次数"
+            },
+            "message": {
+              "type": "string",
+              "default": "请求过于频繁，请稍后再试",
+              "description": "限流提示消息"
+            }
+          },
+          "required": ["windowMs", "max"],
+          "additionalProperties": false
+        },
+        "security": {
+          "type": "object",
+          "properties": {
+            "enableIpWhitelist": {
+              "type": "boolean",
+              "default": false,
+              "description": "是否启用IP白名单"
+            },
+            "ipWhitelist": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "ipv4"
+              },
+              "default": [],
+              "description": "IP白名单列表"
+            },
+            "enableSignature": {
+              "type": "boolean",
+              "default": false,
+              "description": "是否启用签名验证"
+            },
+            "signatureSecret": {
+              "type": "string",
+              "minLength": 8,
+              "description": "签名密钥"
+            },
+            "enableRateLimit": {
+              "type": "boolean",
+              "default": true,
+              "description": "是否启用速率限制"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["maxPayloadSize"],
+      "additionalProperties": false
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["error", "warn", "info", "debug"],
+          "default": "info",
+          "description": "日志级别"
+        },
+        "maxSize": {
+          "type": "string",
+          "pattern": "^\\d+\\s*(kb|mb|gb)?$",
+          "default": "100mb",
+          "description": "单个日志文件最大大小"
+        },
+        "maxFiles": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 5,
+          "description": "最大日志文件数量"
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 30,
+          "description": "日志保留天数"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["combined", "common", "dev", "short", "tiny", "test"],
+          "default": "combined",
+          "description": "日志格式"
+        }
+      },
+      "additionalProperties": false
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["memory", "file", "redis", "database"],
+          "default": "memory",
+          "description": "存储类型"
+        },
+        "maxLogs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 1000000,
+          "default": 10000,
+          "description": "最大日志数量"
+        },
+        "cleanupInterval": {
+          "type": "integer",
+          "minimum": 60000,
+          "default": 3600000,
+          "description": "清理间隔（毫秒）"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "enableMetrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用指标收集"
+        },
+        "metricsPath": {
+          "type": "string",
+          "default": "/metrics",
+          "description": "指标端点路径"
+        },
+        "healthCheckPath": {
+          "type": "string",
+          "default": "/health",
+          "description": "健康检查路径"
+        },
+        "enableHealthCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用健康检查"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark", "auto"],
+          "default": "auto",
+          "description": "UI主题"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["zh-CN", "en-US"],
+          "default": "zh-CN",
+          "description": "界面语言"
+        },
+        "pageSize": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 1000,
+          "default": 50,
+          "description": "分页大小"
+        },
+        "autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否自动刷新"
+        },
+        "refreshInterval": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 300000,
+          "default": 30000,
+          "description": "刷新间隔（毫秒）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "export": {
+      "type": "object",
+      "properties": {
+        "maxRecords": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000,
+          "default": 10000,
+          "description": "最大导出记录数"
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["json", "csv", "excel"]
+          },
+          "minItems": 1,
+          "default": ["json", "csv", "excel"],
+          "description": "支持的导出格式"
+        },
+        "defaultFormat": {
+          "type": "string",
+          "enum": ["json", "csv", "excel"],
+          "default": "excel",
+          "description": "默认导出格式"
+        }
+      },
+      "required": ["formats"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["server", "webhook"],
+  "additionalProperties": true
+}

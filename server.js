@@ -5,13 +5,19 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const ExcelJS = require('exceljs');
 
+// 导入配置管理
+const configManager = require('./lib/config');
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// 从配置管理器获取配置
+const config = configManager.getAll();
+
 // 中间件
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: config.server?.maxBodySize || '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: config.server?.maxBodySize || '10mb' }));
 app.use(express.static('public'));
 
 // 内存存储
@@ -20,20 +26,20 @@ const webhookLogs = new Map(); // 存储webhook日志，每个webhook最多保�
 const webhookAlerts = new Map(); // 存储webhook告警信息
 const webhookStats = new Map(); // 存储webhook统计信息
 
-// 安全配置
+// 安全配置 - 从配置管理器获取
 let securityConfig = {
-  ipWhitelist: [],
-  enableIpWhitelist: false,
+  ipWhitelist: config.webhook?.security?.ipWhitelist || [],
+  enableIpWhitelist: config.webhook?.security?.enableIpWhitelist || false,
   enableRequestValidation: true,
-  maxRequestSize: 10 * 1024 * 1024, // 10MB
+  maxRequestSize: config.webhook?.maxPayloadSize || '10mb',
   rateLimiting: {
-    enabled: true,
-    windowMs: 15 * 60 * 1000, // 15分钟
-    maxRequests: 100 // 每个IP最多100个请求
+    enabled: config.webhook?.security?.enableRateLimit || true,
+    windowMs: config.webhook?.rateLimit?.windowMs || 15 * 60 * 1000, // 15分钟
+    maxRequests: config.webhook?.rateLimit?.max || 100 // 每个IP最多100个请求
   },
   requestSignature: {
-    enabled: false,
-    secretKey: '',
+    enabled: config.webhook?.security?.enableSignature || false,
+    secretKey: config.webhook?.security?.signatureSecret || '',
     algorithm: 'sha256'
   }
 };
@@ -292,6 +298,14 @@ function checkAlerts(webhookId) {
     console.log(`[告警] 为Webhook ${webhookId} 生成了 ${alerts.length} 条告警`);
   }
 }
+
+// 配置管理API路由
+const configApiRouter = require('./lib/config-api');
+app.use('/api/config', configApiRouter);
+
+// 系统监控API
+const systemMonitorApiRouter = require('./lib/system-monitor-api');
+app.use('/api/system-monitor', systemMonitorApiRouter);
 
 // 路由
 
@@ -765,7 +779,13 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Webhook工具已启动，访问地址: http://localhost:${PORT}`);
+// 从配置管理器获取端口和主机配置
+const PORT = config.server?.port || process.env.PORT || 3000;
+const HOST = config.server?.host || process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  console.log(`Webhook工具已启动，访问地址: http://${HOST}:${PORT}`);
+  console.log(`配置管理界面: http://${HOST}:${PORT}/config-manager.html`);
+  console.log(`当前环境: ${configManager.env}`);
+  console.log(`配置状态: ${configManager.isValid() ? '有效' : '无效'}`);
 });

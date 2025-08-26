@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  webhook-tool:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: webhook-tool-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=debug
+      - DEBUG=webhook:*
+    volumes:
+      # 开发环境代码热重载
+      - .:/app
+      - /app/node_modules
+      - webhook-dev-logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - webhook-dev-network
+    command: npm run dev
+    depends_on:
+      - redis-dev
+
+  # 开发环境Redis
+  redis-dev:
+    image: redis:7-alpine
+    container_name: webhook-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    restart: unless-stopped
+    networks:
+      - webhook-dev-network
+    command: redis-server --appendonly yes
+
+  # 开发环境数据库（可选）
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: webhook-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=webhook_dev
+      - POSTGRES_USER=webhook
+      - POSTGRES_PASSWORD=webhook123
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - webhook-dev-network
+
+  # 开发环境监控
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: webhook-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis-dev:6379
+    restart: unless-stopped
+    networks:
+      - webhook-dev-network
+    depends_on:
+      - redis-dev
+
+volumes:
+  webhook-dev-logs:
+    driver: local
+  redis-dev-data:
+    driver: local
+  postgres-dev-data:
+    driver: local
+
+networks:
+  webhook-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16

@@ -1,0 +1,53 @@
+{
+  "server": {
+    "port": 3000,
+    "host": "0.0.0.0",
+    "timeout": 30000,
+    "maxBodySize": "100mb"
+  },
+  "webhook": {
+    "maxPayloadSize": "10mb",
+    "rateLimit": {
+      "windowMs": 900000,
+      "max": 100,
+      "message": "请求过于频繁，请稍后再试"
+    },
+    "security": {
+      "enableIpWhitelist": false,
+      "ipWhitelist": [],
+      "enableSignature": false,
+      "signatureSecret": "",
+      "enableRateLimit": true
+    }
+  },
+  "logging": {
+    "level": "info",
+    "maxSize": "100mb",
+    "maxFiles": 5,
+    "retentionDays": 30,
+    "format": "combined"
+  },
+  "storage": {
+    "type": "memory",
+    "maxLogs": 10000,
+    "cleanupInterval": 3600000
+  },
+  "monitoring": {
+    "enableMetrics": true,
+    "metricsPath": "/metrics",
+    "healthCheckPath": "/health",
+    "enableHealthCheck": true
+  },
+  "ui": {
+    "theme": "auto",
+    "language": "zh-CN",
+    "pageSize": 50,
+    "autoRefresh": true,
+    "refreshInterval": 30000
+  },
+  "export": {
+    "maxRecords": 10000,
+    "formats": ["json", "csv", "excel"],
+    "defaultFormat": "excel"
+  }
+}
