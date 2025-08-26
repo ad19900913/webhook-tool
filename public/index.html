@@ -11,6 +11,13 @@
         <header>
             <h1>🔗 Webhook回调工具</h1>
             <div class="header-right">
+            <div class="header-actions">
+                <button id="batchModeBtn" class="btn btn-secondary">📋 批量操作</button>
+                <button id="exportBtn" class="btn btn-secondary">📊 导出Excel</button>
+                <button id="showStatsBtn" class="btn btn-primary">📊 统计图表</button>
+                <button id="themeToggle" class="btn btn-secondary">🌙 暗色主题</button>
+                <button id="securityConfigBtn" class="btn btn-secondary">🔒 安全配置</button>
+            </div>
                 <div class="system-status" id="systemStatus">
                     <div class="memory-info">
                         <span class="memory-label">内存使用:</span>
@@ -25,10 +32,89 @@
         </header>
 
         <main class="main-layout">
+            <!-- 统计图表区域 -->
+            <section class="stats-section" id="statsSection" style="display: none;">
+                <div class="stats-header">
+                    <h2>实时统计与告警</h2>
+                    <div class="stats-controls">
+                        <button id="closeStatsBtn" class="btn btn-small btn-secondary">关闭</button>
+                    </div>
+                </div>
+                <div class="stats-content">
+                    <div class="stats-card">
+                        <h3>请求成功率</h3>
+                        <div class="chart-container">
+                            <canvas id="successRateChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>响应时间统计</h3>
+                        <div class="chart-container">
+                            <canvas id="responseTimeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>请求趋势图</h3>
+                        <div class="chart-container">
+                            <canvas id="requestTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>来源分析 - IP地址</h3>
+                        <div class="chart-container">
+                            <canvas id="ipSourceChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>来源分析 - User-Agent</h3>
+                        <div class="chart-container">
+                            <canvas id="userAgentChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>响应时间分布</h3>
+                        <div class="chart-container">
+                            <canvas id="responseTimeDistChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>性能监控</h3>
+                        <div class="chart-container">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>错误类型统计</h3>
+                        <div class="chart-container">
+                            <canvas id="errorTypeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3>错误趋势分析</h3>
+                        <div class="chart-container">
+                            <canvas id="errorTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card alerts-card">
+                        <h3>告警信息</h3>
+                        <div class="alerts-container" id="alertsContainer">
+                            <div class="no-alerts">暂无告警信息</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
             <!-- 左侧Webhook列表 -->
             <aside class="sidebar">
                 <div class="sidebar-header">
                     <h2>Webhook列表</h2>
+                    <div class="batch-actions" id="batchActions" style="display: none;">
+                        <button id="selectAllBtn" class="btn btn-small btn-secondary">全选</button>
+                        <button id="batchEnableBtn" class="btn btn-small btn-success">启用</button>
+                        <button id="batchDisableBtn" class="btn btn-small btn-warning">禁用</button>
+                        <button id="batchDeleteBtn" class="btn btn-small btn-danger">删除</button>
+                        <button id="exitBatchBtn" class="btn btn-small btn-secondary">退出</button>
+                    </div>
                     <button id="createBtn2" class="btn btn-small btn-primary">新建</button>
                 </div>
                 <div class="sidebar-search">
@@ -59,11 +145,21 @@
                                 <input type="text" id="uniqueIdSearch" placeholder="搜索 uniqueId">
                                 <button id="clearSearchBtn" class="btn btn-small btn-secondary">清空搜索</button>
                             </div>
+                            <div class="time-range-controls">
+                                <input type="datetime-local" id="startTimeFilter" placeholder="开始时间">
+                                <span>至</span>
+                                <input type="datetime-local" id="endTimeFilter" placeholder="结束时间">
+                                <button id="applyTimeFilterBtn" class="btn btn-small btn-primary">应用</button>
+                                <button id="clearTimeFilterBtn" class="btn btn-small btn-secondary">清除</button>
+                            </div>
                             <div class="type-stats" id="typeStats"></div>
                             <div class="log-limit-notice">
                                 <small>📝 每种消息类型最多保留1000条日志</small>
                             </div>
-                            <button id="clearLogsBtn" class="btn btn-secondary">清空日志</button>
+                            <div class="logs-actions">
+                                <button id="exportLogsBtn" class="btn btn-primary">导出Excel</button>
+                                <button id="clearLogsBtn" class="btn btn-secondary">清空日志</button>
+                            </div>
                         </div>
                     </div>
                     <div id="logsContainer" class="logs-container">
@@ -163,7 +259,216 @@
         </div>
     </div>
 
+    <!-- 仪表板配置模态框 -->
+    <div id="dashboardConfigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>仪表板配置</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="dashboard-config">
+                    <div class="config-section">
+                        <h4>图表显示配置</h4>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showSuccessRate" checked>
+                                    显示成功率图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showResponseTime" checked>
+                                    显示响应时间图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showRequestTrend" checked>
+                                    显示请求趋势图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showIpSource" checked>
+                                    显示IP来源图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showUserAgent" checked>
+                                    显示User-Agent图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showResponseTimeDist" checked>
+                                    显示响应时间分布图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showPerformance" checked>
+                                    显示性能监控图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showErrorType" checked>
+                                    显示错误类型图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showErrorTrend" checked>
+                                    显示错误趋势图表
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="showAlerts" checked>
+                                    显示告警信息
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="config-section">
+                        <h4>布局配置</h4>
+                        <div class="form-group">
+                            <label for="dashboardLayout">布局方式：</label>
+                            <select id="dashboardLayout">
+                                <option value="grid">网格布局</option>
+                                <option value="list">列表布局</option>
+                                <option value="compact">紧凑布局</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="columnsCount">每行显示列数：</label>
+                            <select id="columnsCount">
+                                <option value="1">1列</option>
+                                <option value="2" selected>2列</option>
+                                <option value="3">3列</option>
+                                <option value="4">4列</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="config-section">
+                        <h4>数据刷新配置</h4>
+                        <div class="form-group">
+                            <label for="refreshInterval">自动刷新间隔：</label>
+                            <select id="refreshInterval">
+                                <option value="0">不自动刷新</option>
+                                <option value="5000">5秒</option>
+                                <option value="10000" selected>10秒</option>
+                                <option value="30000">30秒</option>
+                                <option value="60000">1分钟</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="resetDashboardConfig">重置默认</button>
+                <button type="button" class="btn btn-primary" id="saveDashboardConfig">保存配置</button>
+                <button type="button" class="btn btn-secondary" id="cancelDashboardConfig">取消</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="script.js"></script>
+    <!-- 安全配置模态框 -->
+    <div id="securityConfigModal" class="modal">
+        <div class="modal-content security-config">
+            <div class="modal-header">
+                <h3>🔒 安全配置</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="security-section">
+                    <h4>IP白名单</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableIpWhitelist"> 启用IP白名单
+                        </label>
+                        <small>启用后，只有白名单中的IP地址才能访问webhook</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="ipWhitelist">白名单IP地址（每行一个）：</label>
+                        <textarea id="ipWhitelist" rows="5" placeholder="127.0.0.1&#10;192.168.1.100&#10;10.0.0.0/8"></textarea>
+                    </div>
+                </div>
+
+                <div class="security-section">
+                    <h4>速率限制</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableRateLimit" checked> 启用速率限制
+                        </label>
+                        <small>防止恶意请求和DDoS攻击</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rateLimitWindow">时间窗口（分钟）：</label>
+                            <input type="number" id="rateLimitWindow" value="15" min="1" max="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="rateLimitMax">最大请求数：</label>
+                            <input type="number" id="rateLimitMax" value="100" min="1" max="10000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="security-section">
+                    <h4>请求验证</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableRequestValidation" checked> 启用请求验证
+                        </label>
+                        <small>验证请求格式和大小</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="maxRequestSize">最大请求大小（MB）：</label>
+                        <input type="number" id="maxRequestSize" value="10" min="1" max="100">
+                    </div>
+                </div>
+
+                <div class="security-section">
+                    <h4>请求签名</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enableSignature"> 启用请求签名验证
+                        </label>
+                        <small>使用HMAC验证请求的完整性</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="signatureSecret">密钥：</label>
+                            <input type="password" id="signatureSecret" placeholder="输入签名密钥">
+                        </div>
+                        <div class="form-group">
+                            <label for="signatureAlgorithm">算法：</label>
+                            <select id="signatureAlgorithm">
+                                <option value="sha256">SHA-256</option>
+                                <option value="sha1">SHA-1</option>
+                                <option value="md5">MD5</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="saveSecurityConfig" class="btn btn-primary">保存配置</button>
+                <button id="resetSecurityConfig" class="btn btn-secondary">重置默认</button>
+                <button id="cancelSecurityConfig" class="btn btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

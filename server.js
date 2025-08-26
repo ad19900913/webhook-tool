@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,6 +17,67 @@ app.use(express.static('public'));
 // 内存存储
 const webhooks = new Map(); // 存储webhook配置
 const webhookLogs = new Map(); // 存储webhook日志，每个webhook最多保留100条
+const webhookAlerts = new Map(); // 存储webhook告警信息
+const webhookStats = new Map(); // 存储webhook统计信息
+
+// 安全配置
+let securityConfig = {
+  ipWhitelist: [],
+  enableIpWhitelist: false,
+  enableRequestValidation: true,
+  maxRequestSize: 10 * 1024 * 1024, // 10MB
+  rateLimiting: {
+    enabled: true,
+    windowMs: 15 * 60 * 1000, // 15分钟
+    maxRequests: 100 // 每个IP最多100个请求
+  },
+  requestSignature: {
+    enabled: false,
+    secretKey: '',
+    algorithm: 'sha256'
+  }
+};
+
+// 请求计数器（用于速率限制）
+const requestCounts = new Map();
+
+// 安全中间件
+function securityMiddleware(req, res, next) {
+  const clientIp = req.ip || req.connection.remoteAddress;
+  
+  // IP白名单检查
+  if (securityConfig.enableIpWhitelist && securityConfig.ipWhitelist.length > 0) {
+    if (!securityConfig.ipWhitelist.includes(clientIp)) {
+      return res.status(403).json({ error: 'IP地址不在白名单中' });
+    }
+  }
+  
+  // 速率限制检查
+  if (securityConfig.rateLimiting.enabled) {
+    const now = Date.now();
+    const windowStart = now - securityConfig.rateLimiting.windowMs;
+    
+    if (!requestCounts.has(clientIp)) {
+      requestCounts.set(clientIp, []);
+    }
+    
+    const ipRequests = requestCounts.get(clientIp);
+    // 清理过期的请求记录
+    const validRequests = ipRequests.filter(timestamp => timestamp > windowStart);
+    
+    if (validRequests.length >= securityConfig.rateLimiting.maxRequests) {
+      return res.status(429).json({ 
+        error: '请求过于频繁，请稍后再试',
+        retryAfter: Math.ceil(securityConfig.rateLimiting.windowMs / 1000)
+      });
+    }
+    
+    validRequests.push(now);
+    requestCounts.set(clientIp, validRequests);
+  }
+  
+  next();
+}
 
 // 工具函数
 function generateWebhookId() {
@@ -67,6 +129,168 @@ function addLog(webhookId, logData) {
   }
   
   webhookLogs.set(webhookId, webhookData);
+  
+  // 更新统计信息并检查告警
+  updateStatsAndCheckAlerts(webhookId, logData);
+}
+
+// 更新统计信息并检查告警
+function updateStatsAndCheckAlerts(webhookId, logData) {
+  // 初始化统计信息
+  if (!webhookStats.has(webhookId)) {
+    webhookStats.set(webhookId, {
+      requestCounts: {
+        last1Minute: [],
+        last5Minutes: [],
+        last15Minutes: []
+      },
+      errorCounts: {
+        last5Minutes: 0,
+        total: 0
+      },
+      responseTimes: [],
+      lastAlertTime: null
+    });
+  }
+  
+  const stats = webhookStats.get(webhookId);
+  const now = new Date();
+  
+  // 更新请求计数
+  stats.requestCounts.last1Minute.push({
+    timestamp: now,
+    logId: logData.id
+  });
+  stats.requestCounts.last5Minutes.push({
+    timestamp: now,
+    logId: logData.id
+  });
+  stats.requestCounts.last15Minutes.push({
+    timestamp: now,
+    logId: logData.id
+  });
+  
+  // 清理过期的请求记录
+  const oneMinuteAgo = new Date(now - 60 * 1000);
+  const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+  const fifteenMinutesAgo = new Date(now - 15 * 60 * 1000);
+  
+  stats.requestCounts.last1Minute = stats.requestCounts.last1Minute.filter(item => item.timestamp >= oneMinuteAgo);
+  stats.requestCounts.last5Minutes = stats.requestCounts.last5Minutes.filter(item => item.timestamp >= fiveMinutesAgo);
+  stats.requestCounts.last15Minutes = stats.requestCounts.last15Minutes.filter(item => item.timestamp >= fifteenMinutesAgo);
+  
+  // 检查是否为错误请求（这里简单判断，可以根据实际需求调整）
+  let isError = false;
+  if (logData.body && logData.body.error) {
+    isError = true;
+  } else if (logData.body && logData.body.statusCode && (logData.body.statusCode < 200 || logData.body.statusCode >= 400)) {
+    isError = true;
+  } else if (logData.messageType === 'ERROR' || logData.messageType === 'ALARM') {
+    isError = true;
+  }
+  
+  // 更新错误计数
+  if (isError) {
+    stats.errorCounts.total++;
+    if (logData.timestamp >= fiveMinutesAgo) {
+      stats.errorCounts.last5Minutes++;
+    }
+  }
+  
+  // 更新响应时间
+  if (logData.body && logData.body.responseTime) {
+    stats.responseTimes.push({
+      timestamp: now,
+      value: logData.body.responseTime
+    });
+  }
+  
+  // 只保留最近15分钟的响应时间数据
+  stats.responseTimes = stats.responseTimes.filter(item => item.timestamp >= fifteenMinutesAgo);
+  
+  // 保存更新后的统计信息
+  webhookStats.set(webhookId, stats);
+  
+  // 检查告警条件
+  checkAlerts(webhookId);
+}
+
+// 检查告警条件
+function checkAlerts(webhookId) {
+  const stats = webhookStats.get(webhookId);
+  const webhook = webhooks.get(webhookId);
+  
+  if (!stats || !webhook) return;
+  
+  const now = new Date();
+  const alerts = [];
+  
+  // 如果最近一次告警时间在5分钟内，则不再发送新告警
+  if (stats.lastAlertTime && (now - stats.lastAlertTime) < 5 * 60 * 1000) {
+    return;
+  }
+  
+  // 检查高频请求告警 - 每分钟超过30个请求
+  const requestsPerMinute = stats.requestCounts.last1Minute.length;
+  if (requestsPerMinute > 30) {
+    alerts.push({
+      type: 'HIGH_FREQUENCY',
+      message: `高频请求告警: ${webhook.name} 在过去1分钟内收到了 ${requestsPerMinute} 个请求`,
+      level: 'warning',
+      timestamp: now.toISOString()
+    });
+  }
+  
+  // 检查错误率告警 - 5分钟内错误率超过20%
+  const requestsIn5Min = stats.requestCounts.last5Minutes.length;
+  if (requestsIn5Min > 0) {
+    const errorRate = (stats.errorCounts.last5Minutes / requestsIn5Min) * 100;
+    if (errorRate > 20) {
+      alerts.push({
+        type: 'ERROR_RATE',
+        message: `错误率告警: ${webhook.name} 在过去5分钟内的错误率为 ${errorRate.toFixed(2)}%`,
+        level: 'error',
+        timestamp: now.toISOString(),
+        details: {
+          errorRate: errorRate,
+          totalRequests: requestsIn5Min,
+          errorRequests: stats.errorCounts.last5Minutes
+        }
+      });
+    }
+  }
+  
+  // 如果有告警，则发送并记录
+  if (alerts.length > 0) {
+    // 更新最后告警时间
+    stats.lastAlertTime = now;
+    webhookStats.set(webhookId, stats);
+    
+    // 存储告警信息
+    if (!webhookAlerts.has(webhookId)) {
+      webhookAlerts.set(webhookId, []);
+    }
+    
+    const alertsList = webhookAlerts.get(webhookId);
+    alerts.forEach(alert => {
+      alertsList.unshift(alert);
+    });
+    
+    // 最多保留100条告警记录
+    if (alertsList.length > 100) {
+      alertsList.splice(100);
+    }
+    
+    webhookAlerts.set(webhookId, alertsList);
+    
+    // 通过Socket.IO发送告警
+    io.emit('webhook-alerts', {
+      webhookId: webhookId,
+      alerts: alerts
+    });
+    
+    console.log(`[告警] 为Webhook ${webhookId} 生成了 ${alerts.length} 条告警`);
+  }
 }
 
 // 路由
@@ -134,6 +358,75 @@ app.get('/api/system/status', (req, res) => {
     webhookCount: webhooks.size,
     uptime: Math.floor(process.uptime())
   });
+});
+
+// 获取安全配置
+app.get('/api/security/config', (req, res) => {
+  res.json(securityConfig);
+});
+
+// 更新安全配置
+app.put('/api/security/config', (req, res) => {
+  const {
+    ipWhitelist,
+    enableIpWhitelist,
+    enableRequestValidation,
+    maxRequestSize,
+    rateLimiting,
+    requestSignature
+  } = req.body;
+  
+  if (ipWhitelist !== undefined) {
+    securityConfig.ipWhitelist = Array.isArray(ipWhitelist) ? ipWhitelist : [];
+  }
+  
+  if (enableIpWhitelist !== undefined) {
+    securityConfig.enableIpWhitelist = Boolean(enableIpWhitelist);
+  }
+  
+  if (enableRequestValidation !== undefined) {
+    securityConfig.enableRequestValidation = Boolean(enableRequestValidation);
+  }
+  
+  if (maxRequestSize !== undefined) {
+    securityConfig.maxRequestSize = Number(maxRequestSize) || 10 * 1024 * 1024;
+  }
+  
+  if (rateLimiting !== undefined) {
+    securityConfig.rateLimiting = {
+      enabled: Boolean(rateLimiting.enabled),
+      windowMs: Number(rateLimiting.windowMs) || 15 * 60 * 1000,
+      maxRequests: Number(rateLimiting.maxRequests) || 100
+    };
+  }
+  
+  if (requestSignature !== undefined) {
+    securityConfig.requestSignature = {
+      enabled: Boolean(requestSignature.enabled),
+      secretKey: String(requestSignature.secretKey || ''),
+      algorithm: String(requestSignature.algorithm || 'sha256')
+    };
+  }
+  
+  res.json({
+    message: '安全配置已更新',
+    config: securityConfig
+  });
+});
+
+// 获取请求统计信息
+app.get('/api/security/stats', (req, res) => {
+  const stats = {
+    activeIPs: requestCounts.size,
+    totalRequests: 0,
+    blockedRequests: 0
+  };
+  
+  requestCounts.forEach(requests => {
+    stats.totalRequests += requests.length;
+  });
+  
+  res.json(stats);
 });
 
 // 创建webhook
@@ -309,8 +602,100 @@ app.delete('/api/webhooks/:id/logs', (req, res) => {
   res.json({ message: '日志已清空' });
 });
 
+// 获取webhook告警信息
+app.get('/api/webhooks/:id/alerts', (req, res) => {
+  const id = req.params.id;
+  
+  // 检查webhook是否存在
+  if (!webhooks.has(id)) {
+    return res.status(404).json({ error: 'Webhook不存在' });
+  }
+  
+  const alerts = webhookAlerts.get(id) || [];
+  
+  res.json({
+    alerts: alerts,
+    count: alerts.length
+  });
+});
+
+// 导出webhook日志为Excel格式
+app.get('/api/webhooks/:id/export', async (req, res) => {
+  const id = req.params.id;
+  const type = req.query.type;
+  
+  // 检查webhook是否存在
+  if (!webhooks.has(id)) {
+    return res.status(404).json({ error: 'Webhook不存在' });
+  }
+  
+  const webhook = webhooks.get(id);
+  const webhookData = webhookLogs.get(id);
+  
+  if (!webhookData || !webhookData.all || webhookData.all.length === 0) {
+    return res.status(404).json({ error: '没有可导出的日志数据' });
+  }
+  
+  // 获取要导出的日志
+  let logsToExport = [];
+  if (type && type !== 'all' && webhookData.byType && webhookData.byType[type]) {
+    logsToExport = webhookData.byType[type];
+  } else {
+    logsToExport = webhookData.all;
+  }
+  
+  if (logsToExport.length === 0) {
+    return res.status(404).json({ error: '没有可导出的日志数据' });
+  }
+  
+  try {
+    // 创建工作簿和工作表
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Webhook日志');
+    
+    // 设置列
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 36 },
+      { header: '时间', key: 'timestamp', width: 20 },
+      { header: '方法', key: 'method', width: 10 },
+      { header: 'URL', key: 'url', width: 30 },
+      { header: 'IP地址', key: 'ip', width: 15 },
+      { header: '消息类型', key: 'messageType', width: 15 },
+      { header: '请求头', key: 'headers', width: 40 },
+      { header: '请求体', key: 'body', width: 50 }
+    ];
+    
+    // 添加数据
+    logsToExport.forEach(log => {
+      worksheet.addRow({
+        id: log.id,
+        timestamp: log.timestamp,
+        method: log.method,
+        url: log.url,
+        ip: log.ip,
+        messageType: log.messageType || 'DEFAULT',
+        headers: JSON.stringify(log.headers),
+        body: JSON.stringify(log.body)
+      });
+    });
+    
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=webhook-logs-${id}-${new Date().toISOString().slice(0,10)}.xlsx`);
+    
+    // 将工作簿写入响应
+    await workbook.xlsx.write(res);
+    res.end();
+    
+    console.log(`[API] 导出日志成功 - Webhook ID: ${id}, 类型: ${type || 'all'}, 共 ${logsToExport.length} 条`);
+  } catch (error) {
+    console.error('导出日志失败:', error);
+    res.status(500).json({ error: '导出日志失败', details: error.message });
+  }
+});
+
 // Webhook回调处理
-app.all('/webhook/:path(*)', function(req, res) {
+app.all('/webhook/:path(*)', securityMiddleware, function(req, res) {
   const webhookPath = req.params.path;
   const webhook = webhooks.get(webhookPath);
   
