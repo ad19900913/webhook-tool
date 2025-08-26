@@ -6,19 +6,7 @@
     "maxBodySize": "100mb"
   },
   "webhook": {
-    "maxPayloadSize": "10mb",
-    "rateLimit": {
-      "windowMs": 900000,
-      "max": 1000,
-      "message": "请求过于频繁，请稍后再试"
-    },
-    "security": {
-      "enableIpWhitelist": false,
-      "ipWhitelist": [],
-      "enableSignature": false,
-      "signatureSecret": "dev-secret-key",
-      "enableRateLimit": false
-    }
+    "maxPayloadSize": "10mb"
   },
   "logging": {
     "level": "debug",
