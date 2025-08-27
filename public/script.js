@@ -38,23 +38,6 @@ let performanceChart = null;
 let errorTypeChart = null;
 let errorTrendChart = null;
 
-// 数据清理相关变量
-let cleanupHistory = [];
-let cleanupStats = null;
-
-// 内存优化相关变量
-let memoryChart = null;
-let memoryHistory = [];
-let memoryConfig = null;
-let memoryStatus = null;
-
-// 界面交互优化相关变量
-let asyncConfig = null;
-let asyncStats = null;
-let compressionConfig = null;
-let compressionStats = null;
-let keyboardShortcutsVisible = false;
-
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 页面加载完成，开始初始化...');
@@ -62,1027 +45,1034 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeSocket();
     loadWebhooks();
     bindEvents();
-    startMemoryMonitoring();
-    initTheme();
     loadQuickFilters(); // 加载快速过滤配置
-    initInterfaceOptimization();
-    initDataDisplayOptimization();
-    initSearchFilterOptimization();
+    initializeAdvancedSearch(); // 初始化高级搜索
+    startMemoryMonitoring();
+    
+    // 初始化拖拽排序
+    setTimeout(() => {
+        initSortable();
+    }, 1000);
+    
+    // 绑定快捷键
+    bindShortcuts();
+    
+    // 绑定帮助快捷键
+    document.addEventListener('keydown', (e) => {
+        if (e.key === '?' && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            showShortcutHelp();
+        }
+    });
+    
+    // 启动操作引导
+    setTimeout(startTour, 2000);
 });
+
+// ==================== 高级搜索功能 ====================
+
+// 初始化高级搜索
+function initializeAdvancedSearch() {
+    // 重置搜索条件
+    advancedSearchConditions = [];
+    updateAdvancedSearchDisplay();
+    
+    // 加载搜索历史
+    loadSearchHistory();
+}
+
+// 添加搜索条件
+function addSearchCondition() {
+    const condition = {
+        id: Date.now(),
+        field: 'tenantId',
+        operator: 'equals',
+        value: '',
+        logic: 'AND'
+    };
+    
+    advancedSearchConditions.push(condition);
+    updateAdvancedSearchDisplay();
+}
+
+// 更新高级搜索显示
+function updateAdvancedSearchDisplay() {
+    const container = document.getElementById('advancedSearchConditions');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    advancedSearchConditions.forEach((condition, index) => {
+        const conditionElement = createConditionElement(condition, index);
+        container.appendChild(conditionElement);
+    });
+    
+    // 如果没有条件，显示添加按钮
+    if (advancedSearchConditions.length === 0) {
+        const addButton = document.createElement('button');
+        addButton.className = 'ant-btn ant-btn-dashed';
+        addButton.innerHTML = '<span class="anticon">➕</span> 添加搜索条件';
+        addButton.onclick = addSearchCondition;
+        container.appendChild(addButton);
+    }
+}
+
+// 创建条件元素
+function createConditionElement(condition, index) {
+    const div = document.createElement('div');
+    div.className = 'search-condition';
+    
+    const fields = [
+        { value: 'tenantId', label: 'Tenant ID' },
+        { value: 'uniqueId', label: 'Unique ID' },
+        { value: 'url', label: 'URL' },
+        { value: 'method', label: '请求方法' },
+        { value: 'statusCode', label: '状态码' },
+        { value: 'responseTime', label: '响应时间' },
+        { value: 'timestamp', label: '时间戳' },
+        { value: 'ip', label: 'IP地址' },
+        { value: 'userAgent', label: 'User Agent' }
+    ];
+    
+    const operators = [
+        { value: 'equals', label: '等于' },
+        { value: 'contains', label: '包含' },
+        { value: 'startsWith', label: '开始于' },
+        { value: 'endsWith', label: '结束于' },
+        { value: 'gt', label: '大于' },
+        { value: 'lt', label: '小于' },
+        { value: 'gte', label: '大于等于' },
+        { value: 'lte', label: '小于等于' },
+        { value: 'between', label: '介于' },
+        { value: 'regex', label: '正则表达式' }
+    ];
+    
+    div.innerHTML = `
+        ${index > 0 ? `
+            <select class="ant-select logic-select" onchange="updateCondition(${condition.id}, 'logic', this.value)">
+                <option value="AND" ${condition.logic === 'AND' ? 'selected' : ''}>AND</option>
+                <option value="OR" ${condition.logic === 'OR' ? 'selected' : ''}>OR</option>
+            </select>
+        ` : ''}
+        
+        <select class="ant-select field-select" onchange="updateCondition(${condition.id}, 'field', this.value)">
+            ${fields.map(field => 
+                `<option value="${field.value}" ${condition.field === field.value ? 'selected' : ''}>${field.label}</option>`
+            ).join('')}
+        </select>
+        
+        <select class="ant-select operator-select" onchange="updateCondition(${condition.id}, 'operator', this.value)">
+            ${operators.map(op => 
+                `<option value="${op.value}" ${condition.operator === op.value ? 'selected' : ''}>${op.label}</option>`
+            ).join('')}
+        </select>
+        
+        <input type="text" class="ant-input value-input" placeholder="输入值" 
+               value="${condition.value}" 
+               onchange="updateCondition(${condition.id}, 'value', this.value)">
+        
+        <button class="ant-btn ant-btn-danger ant-btn-sm" onclick="removeCondition(${condition.id})">
+            <span class="anticon">🗑️</span>
+        </button>
+    `;
+    
+    return div;
+}
+
+// 更新条件
+function updateCondition(id, field, value) {
+    const condition = advancedSearchConditions.find(c => c.id === id);
+    if (condition) {
+        condition[field] = value;
+    }
+}
+
+// 移除条件
+function removeCondition(id) {
+    advancedSearchConditions = advancedSearchConditions.filter(c => c.id !== id);
+    updateAdvancedSearchDisplay();
+}
+
+// 执行高级搜索
+function executeAdvancedSearch() {
+    if (advancedSearchConditions.length === 0) {
+        showNotification('请添加至少一个搜索条件', 'warning');
+        return;
+    }
+    
+    // 验证条件
+    const invalidConditions = advancedSearchConditions.filter(c => !c.value.trim());
+    if (invalidConditions.length > 0) {
+        showNotification('请填写所有搜索条件的值', 'warning');
+        return;
+    }
+    
+    // 应用搜索
+    const filteredLogs = allLogs.filter(log => {
+        return evaluateConditions(log, advancedSearchConditions);
+    });
+    
+    // 保存当前搜索
+    currentAdvancedSearch = JSON.parse(JSON.stringify(advancedSearchConditions));
+    
+    // 保存到搜索历史
+    saveToSearchHistory();
+    
+    // 显示结果
+    displayLogs(filteredLogs);
+    
+    // 关闭搜索面板
+    document.getElementById('advancedSearchPanel').style.display = 'none';
+    
+    showNotification(`高级搜索完成，找到 ${filteredLogs.length} 条记录`, 'success');
+}
+
+// 评估搜索条件
+function evaluateConditions(log, conditions) {
+    if (conditions.length === 0) return true;
+    
+    let result = evaluateCondition(log, conditions[0]);
+    
+    for (let i = 1; i < conditions.length; i++) {
+        const condition = conditions[i];
+        const conditionResult = evaluateCondition(log, condition);
+        
+        if (condition.logic === 'AND') {
+            result = result && conditionResult;
+        } else {
+            result = result || conditionResult;
+        }
+    }
+    
+    return result;
+}
+
+// 评估单个条件
+function evaluateCondition(log, condition) {
+    const fieldValue = getFieldValue(log, condition.field);
+    const searchValue = condition.value;
+    
+    switch (condition.operator) {
+        case 'equals':
+            return String(fieldValue).toLowerCase() === searchValue.toLowerCase();
+        case 'contains':
+            return String(fieldValue).toLowerCase().includes(searchValue.toLowerCase());
+        case 'startsWith':
+            return String(fieldValue).toLowerCase().startsWith(searchValue.toLowerCase());
+        case 'endsWith':
+            return String(fieldValue).toLowerCase().endsWith(searchValue.toLowerCase());
+        case 'gt':
+            return Number(fieldValue) > Number(searchValue);
+        case 'lt':
+            return Number(fieldValue) < Number(searchValue);
+        case 'gte':
+            return Number(fieldValue) >= Number(searchValue);
+        case 'lte':
+            return Number(fieldValue) <= Number(searchValue);
+        case 'between':
+            const [min, max] = searchValue.split(',').map(v => Number(v.trim()));
+            return Number(fieldValue) >= min && Number(fieldValue) <= max;
+        case 'regex':
+            try {
+                const regex = new RegExp(searchValue, 'i');
+                return regex.test(String(fieldValue));
+            } catch (e) {
+                return false;
+            }
+        default:
+            return false;
+    }
+}
+
+// 获取字段值
+function getFieldValue(log, field) {
+    switch (field) {
+        case 'tenantId':
+            return log.tenantId || '';
+        case 'uniqueId':
+            return log.uniqueId || '';
+        case 'url':
+            return log.url || '';
+        case 'method':
+            return log.method || '';
+        case 'statusCode':
+            return log.statusCode || 0;
+        case 'responseTime':
+            return log.responseTime || 0;
+        case 'timestamp':
+            return log.timestamp || '';
+        case 'ip':
+            return log.ip || '';
+        case 'userAgent':
+            return (log.headers && log.headers['user-agent']) || '';
+        default:
+            return '';
+    }
+}
+
+// 保存搜索历史
+function saveToSearchHistory() {
+    const searchItem = {
+        id: Date.now(),
+        conditions: JSON.parse(JSON.stringify(advancedSearchConditions)),
+        timestamp: new Date().toISOString(),
+        name: generateSearchName()
+    };
+    
+    searchHistory.unshift(searchItem);
+    
+    // 限制历史记录数量
+    if (searchHistory.length > 20) {
+        searchHistory = searchHistory.slice(0, 20);
+    }
+    
+    // 保存到localStorage
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+    
+    updateSearchHistoryDisplay();
+}
+
+// 生成搜索名称
+function generateSearchName() {
+    if (advancedSearchConditions.length === 1) {
+        const condition = advancedSearchConditions[0];
+        return `${condition.field} ${condition.operator} ${condition.value}`;
+    } else {
+        return `${advancedSearchConditions.length} 个条件的搜索`;
+    }
+}
+
+// 加载搜索历史
+function loadSearchHistory() {
+    const saved = localStorage.getItem('searchHistory');
+    if (saved) {
+        searchHistory = JSON.parse(saved);
+        updateSearchHistoryDisplay();
+    }
+}
+
+// 更新搜索历史显示
+function updateSearchHistoryDisplay() {
+    const container = document.getElementById('searchHistoryList');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    searchHistory.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'search-history-item';
+        div.innerHTML = `
+            <div class="search-name">${item.name}</div>
+            <div class="search-time">${new Date(item.timestamp).toLocaleString()}</div>
+            <div class="search-actions">
+                <button class="ant-btn ant-btn-sm" onclick="loadSearchFromHistory(${item.id})">应用</button>
+                <button class="ant-btn ant-btn-sm ant-btn-danger" onclick="removeFromSearchHistory(${item.id})">删除</button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// 从历史记录加载搜索
+function loadSearchFromHistory(id) {
+    const item = searchHistory.find(h => h.id === id);
+    if (item) {
+        advancedSearchConditions = JSON.parse(JSON.stringify(item.conditions));
+        updateAdvancedSearchDisplay();
+        showNotification('搜索条件已加载', 'success');
+    }
+}
+
+// 从历史记录删除搜索
+function removeFromSearchHistory(id) {
+    searchHistory = searchHistory.filter(h => h.id !== id);
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+    updateSearchHistoryDisplay();
+}
+
+// 清空高级搜索
+function clearAdvancedSearch() {
+    advancedSearchConditions = [];
+    currentAdvancedSearch = null;
+    updateAdvancedSearchDisplay();
+    
+    // 重新显示所有日志
+    displayLogs(allLogs);
+    
+    showNotification('高级搜索已清空', 'success');
+}
+
+// ==================== 快速过滤功能 ====================
+
+// 加载快速过滤配置
+function loadQuickFilters() {
+    const saved = localStorage.getItem('quickFilters');
+    if (saved) {
+        savedQuickFilters = JSON.parse(saved);
+        updateQuickFiltersDisplay();
+    }
+}
+
+// 保存快速过滤配置
+function saveQuickFilters() {
+    localStorage.setItem('quickFilters', JSON.stringify(savedQuickFilters));
+}
+
+// 更新快速过滤显示
+function updateQuickFiltersDisplay() {
+    const container = document.getElementById('quickFiltersContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    savedQuickFilters.forEach(filter => {
+        const button = document.createElement('button');
+        button.className = `ant-btn ant-btn-sm ${currentQuickFilter && currentQuickFilter.id === filter.id ? 'ant-btn-primary' : 'ant-btn-default'}`;
+        button.innerHTML = `
+            <span>${filter.name}</span>
+            <span class="filter-close" onclick="event.stopPropagation(); removeQuickFilter(${filter.id})">×</span>
+        `;
+        button.onclick = () => applyQuickFilter(filter);
+        container.appendChild(button);
+    });
+}
+
+// 创建快速过滤
+function createQuickFilter() {
+    const name = prompt('请输入过滤器名称:');
+    if (!name) return;
+    
+    if (advancedSearchConditions.length === 0) {
+        showNotification('请先设置搜索条件', 'warning');
+        return;
+    }
+    
+    const filter = {
+        id: Date.now(),
+        name: name,
+        conditions: JSON.parse(JSON.stringify(advancedSearchConditions))
+    };
+    
+    savedQuickFilters.push(filter);
+    saveQuickFilters();
+    updateQuickFiltersDisplay();
+    
+    showNotification('快速过滤器已创建', 'success');
+}
+
+// 应用快速过滤
+function applyQuickFilter(filter) {
+    currentQuickFilter = filter;
+    advancedSearchConditions = JSON.parse(JSON.stringify(filter.conditions));
+    
+    // 执行搜索
+    const filteredLogs = allLogs.filter(log => {
+        return evaluateConditions(log, advancedSearchConditions);
+    });
+    
+    displayLogs(filteredLogs);
+    updateQuickFiltersDisplay();
+    
+    showNotification(`已应用快速过滤: ${filter.name}`, 'success');
+}
+
+// 移除快速过滤
+function removeQuickFilter(id) {
+    savedQuickFilters = savedQuickFilters.filter(f => f.id !== id);
+    
+    if (currentQuickFilter && currentQuickFilter.id === id) {
+        currentQuickFilter = null;
+        displayLogs(allLogs);
+    }
+    
+    saveQuickFilters();
+    updateQuickFiltersDisplay();
+}
+
+// 清除快速过滤
+function clearQuickFilter() {
+    currentQuickFilter = null;
+    updateQuickFiltersDisplay();
+    displayLogs(allLogs);
+    showNotification('快速过滤已清除', 'success');
+}
+
+// ==================== 核心功能 ====================
 
 // 测试服务器连接
 async function testServerConnection() {
     try {
-        console.log('🔍 测试服务器连接...');
-        const response = await fetch('/api/system/status');
-        
+        const response = await fetch('/api/health');
         if (response.ok) {
-            const data = await response.json();
-            console.log('✅ 服务器连接正常，系统状态:', data);
+            console.log('✅ 服务器连接正常');
             showNotification('服务器连接正常', 'success');
         } else {
-            throw new Error(`服务器响应异常: ${response.status}`);
-}
-
-// 安全配置相关函数
-async function loadSecurityConfig() {
-    try {
-        const response = await fetch('/api/security/config');
-        const config = await response.json();
-        
-        // 更新界面
-        document.getElementById('enableIpWhitelist').checked = config.enableIpWhitelist;
-        document.getElementById('ipWhitelist').value = config.ipWhitelist.join('\n');
-        document.getElementById('enableRateLimit').checked = config.rateLimiting.enabled;
-        document.getElementById('rateLimitWindow').value = config.rateLimiting.windowMs / (60 * 1000);
-        document.getElementById('rateLimitMax').value = config.rateLimiting.maxRequests;
-        document.getElementById('enableRequestValidation').checked = config.enableRequestValidation;
-        document.getElementById('maxRequestSize').value = config.maxRequestSize / (1024 * 1024);
-        document.getElementById('enableSignature').checked = config.requestSignature.enabled;
-        document.getElementById('signatureSecret').value = config.requestSignature.secretKey;
-        document.getElementById('signatureAlgorithm').value = config.requestSignature.algorithm;
-        
+            throw new Error('服务器响应异常');
+        }
     } catch (error) {
-        console.error('加载安全配置失败:', error);
+        console.error('❌ 服务器连接失败:', error);
+        showNotification('服务器连接失败，请检查服务器状态', 'error');
     }
 }
 
-function openSecurityConfig() {
-    document.getElementById('securityConfigModal').style.display = 'block';
-    loadSecurityConfig();
-}
-
-function closeSecurityConfig() {
-    document.getElementById('securityConfigModal').style.display = 'none';
-}
-
-async function saveSecurityConfig() {
-    const config = {
-        enableIpWhitelist: document.getElementById('enableIpWhitelist').checked,
-        ipWhitelist: document.getElementById('ipWhitelist').value
-            .split('\n')
-            .map(ip => ip.trim())
-            .filter(ip => ip.length > 0),
-        enableRequestValidation: document.getElementById('enableRequestValidation').checked,
-        maxRequestSize: parseInt(document.getElementById('maxRequestSize').value) * 1024 * 1024,
-        rateLimiting: {
-            enabled: document.getElementById('enableRateLimit').checked,
-            windowMs: parseInt(document.getElementById('rateLimitWindow').value) * 60 * 1000,
-            maxRequests: parseInt(document.getElementById('rateLimitMax').value)
-        },
-        requestSignature: {
-            enabled: document.getElementById('enableSignature').checked,
-            secretKey: document.getElementById('signatureSecret').value,
-            algorithm: document.getElementById('signatureAlgorithm').value
+// 初始化WebSocket连接
+function initializeSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    
+    socket = new WebSocket(wsUrl);
+    
+    socket.onopen = function() {
+        console.log('🔗 WebSocket连接已建立');
+        showNotification('实时连接已建立', 'success');
+    };
+    
+    socket.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        } catch (error) {
+            console.error('WebSocket消息解析错误:', error);
         }
     };
     
-    try {
-        const response = await fetch('/api/security/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
+    socket.onclose = function() {
+        console.log('🔌 WebSocket连接已断开');
+        showNotification('实时连接已断开，尝试重连...', 'warning');
         
-        if (response.ok) {
-            showNotification('安全配置已保存', 'success');
-            closeSecurityConfig();
-        } else {
-            const error = await response.json();
-            showNotification('保存失败: ' + error.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存安全配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
+        // 5秒后尝试重连
+        setTimeout(() => {
+            initializeSocket();
+        }, 5000);
+    };
+    
+    socket.onerror = function(error) {
+        console.error('WebSocket错误:', error);
+        showNotification('WebSocket连接错误', 'error');
+    };
 }
 
-function resetSecurityConfig() {
-    if (confirm('确定要重置安全配置为默认值吗？')) {
-        document.getElementById('enableIpWhitelist').checked = false;
-        document.getElementById('ipWhitelist').value = '';
-        document.getElementById('enableRateLimit').checked = true;
-        document.getElementById('rateLimitWindow').value = 15;
-        document.getElementById('rateLimitMax').value = 100;
-        document.getElementById('enableRequestValidation').checked = true;
-        document.getElementById('maxRequestSize').value = 10;
-        document.getElementById('enableSignature').checked = false;
-        document.getElementById('signatureSecret').value = '';
-        document.getElementById('signatureAlgorithm').value = 'sha256';
+// 处理WebSocket消息
+function handleWebSocketMessage(data) {
+    switch (data.type) {
+        case 'webhook_created':
+            webhooks.unshift(data.webhook);
+            allWebhooks.unshift(data.webhook);
+            updateWebhookList();
+            showNotification(`新建Webhook: ${data.webhook.name}`, 'success');
+            break;
+            
+        case 'webhook_updated':
+            const index = webhooks.findIndex(w => w.id === data.webhook.id);
+            if (index !== -1) {
+                webhooks[index] = data.webhook;
+                const allIndex = allWebhooks.findIndex(w => w.id === data.webhook.id);
+                if (allIndex !== -1) {
+                    allWebhooks[allIndex] = data.webhook;
+                }
+                updateWebhookList();
+                showNotification(`Webhook已更新: ${data.webhook.name}`, 'info');
+            }
+            break;
+            
+        case 'webhook_deleted':
+            webhooks = webhooks.filter(w => w.id !== data.webhookId);
+            allWebhooks = allWebhooks.filter(w => w.id !== data.webhookId);
+            updateWebhookList();
+            showNotification('Webhook已删除', 'info');
+            break;
+            
+        case 'new_log':
+            logs.unshift(data.log);
+            allLogs.unshift(data.log);
+            
+            // 限制日志数量
+            if (logs.length > 1000) {
+                logs = logs.slice(0, 1000);
+            }
+            if (allLogs.length > 1000) {
+                allLogs = allLogs.slice(0, 1000);
+            }
+            
+            updateLogDisplay();
+            updateStats();
+            
+            // 检查告警条件
+            checkAlerts(data.log);
+            break;
     }
-}
-
-// 在页面加载时绑定安全配置事件
-document.addEventListener('DOMContentLoaded', function() {
-    // 绑定安全配置事件
-    if (document.getElementById('securityConfigBtn')) {
-        document.getElementById('securityConfigBtn').addEventListener('click', openSecurityConfig);
-    }
-    
-    // 绑定系统监控事件
-    if (document.getElementById('systemMonitorBtn')) {
-        document.getElementById('systemMonitorBtn').addEventListener('click', openSystemMonitor);
-    }
-    if (document.getElementById('saveSecurityConfig')) {
-        document.getElementById('saveSecurityConfig').addEventListener('click', saveSecurityConfig);
-    }
-    if (document.getElementById('resetSecurityConfig')) {
-        document.getElementById('resetSecurityConfig').addEventListener('click', resetSecurityConfig);
-    }
-    if (document.getElementById('cancelSecurityConfig')) {
-        document.getElementById('cancelSecurityConfig').addEventListener('click', closeSecurityConfig);
-    }
-    
-    // 初始化安全配置
-    loadSecurityConfig();
-});
-    } catch (error) {
-        console.error('❌ 服务器连接测试失败:', error);
-        showNotification(`服务器连接失败: ${error.message}`, 'error');
-        
-        // 显示连接错误提示
-        const container = document.getElementById('webhookContainer');
-        container.innerHTML = `
-            <div class="no-logs">
-                <div style="color: #e74c3c; margin-bottom: 15px; font-size: 18px;">🚫 服务器连接失败</div>
-                <div style="color: #7f8c8d; margin-bottom: 10px;">无法连接到后端服务器</div>
-                <div style="font-size: 14px; color: #95a5a6; margin-bottom: 15px;">错误信息: ${error.message}</div>
-                <div style="font-size: 12px; color: #95a5a6;">
-                    <p>请检查：</p>
-                    <ul style="text-align: left; margin: 10px 0;">
-                        <li>服务器是否已启动 (node server.js)</li>
-                        <li>端口3000是否被占用</li>
-                        <li>网络连接是否正常</li>
-                    </ul>
-                </div>
-                <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 10px;">重新加载</button>
-            </div>
-        `;
-    }
-}
-
-// 初始化Socket连接
-function initializeSocket() {
-    console.log('正在初始化Socket连接...');
-    
-    socket = io({
-        timeout: 5000,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5
-    });
-    
-    socket.on('connect', function() {
-        console.log('✅ Socket已连接到服务器，ID:', socket.id);
-        showNotification('已连接到服务器', 'success');
-    });
-    
-    socket.on('disconnect', function(reason) {
-        console.log('❌ Socket与服务器断开连接，原因:', reason);
-        showNotification('与服务器断开连接', 'warning');
-    });
-    
-    socket.on('connect_error', function(error) {
-        console.error('❌ Socket连接错误:', error);
-        showNotification('连接服务器失败', 'error');
-    });
-    
-    socket.on('reconnect', function(attemptNumber) {
-        console.log('🔄 Socket重新连接成功，尝试次数:', attemptNumber);
-        showNotification('重新连接成功', 'success');
-    });
-    
-    socket.on('reconnect_error', function(error) {
-        console.error('❌ Socket重连失败:', error);
-    });
-    
-    socket.on('webhook-log', function(data) {
-        console.log('📨 收到新的webhook日志:', data);
-        addLogToUI(data.log, data.webhookId);
-    });
-    
-    socket.on('webhook-alerts', function(data) {
-        console.log('⚠️ 收到新的告警信息:', data);
-        handleNewAlerts(data.alerts, data.webhookId);
-    });
-}
-
-// 绑定事件
-function bindEvents() {
-    // 侧边栏创建按钮
-    document.getElementById('createBtn2').addEventListener('click', function() {
-        openWebhookModal();
-    });
-    
-    // 模态框关闭
-    document.querySelectorAll('.close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', function() {
-            closeModal(this.closest('.modal'));
-        });
-    });
-    
-    // 点击模态框外部关闭
-    window.addEventListener('click', function(event) {
-        if (event.target.classList.contains('modal')) {
-            closeModal(event.target);
-        }
-    });
-    
-    // 表单提交
-    document.getElementById('webhookForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        saveWebhook();
-    });
-    
-    // 取消按钮
-    document.getElementById('cancelBtn').addEventListener('click', function() {
-        closeModal(document.getElementById('webhookModal'));
-    });
-    
-    // 路径类型切换
-    document.getElementById('pathType').addEventListener('change', function() {
-        toggleCustomPath();
-    });
-    
-    // 延时类型切换
-    document.getElementById('delayType').addEventListener('change', function() {
-        toggleDelayOptions();
-    });
-    
-    // Webhook过滤器
-    document.getElementById('webhookFilter').addEventListener('change', function() {
-        selectedWebhookFilter = this.value;
-        loadLogsForWebhook();
-    });
-    
-    // 消息类型过滤器
-    document.getElementById('messageTypeFilter').addEventListener('change', function() {
-        selectedMessageTypeFilter = this.value;
-        loadLogsForWebhook();
-    });
-    
-    // 搜索功能
-    document.getElementById('tenantIdSearch').addEventListener('input', function() {
-        searchFilters.tenantId = this.value.trim();
-        applySearchFilters();
-    });
-    
-    document.getElementById('uniqueIdSearch').addEventListener('input', function() {
-        searchFilters.uniqueId = this.value.trim();
-        applySearchFilters();
-    });
-    
-    document.getElementById('clearSearchBtn').addEventListener('click', function() {
-        document.getElementById('tenantIdSearch').value = '';
-        document.getElementById('uniqueIdSearch').value = '';
-        searchFilters.tenantId = '';
-        searchFilters.uniqueId = '';
-        applySearchFilters();
-    });
-    
-    // 清空日志按钮
-    document.getElementById('clearLogsBtn').addEventListener('click', function() {
-        clearLogs();
-    });
-    
-    // 清除高级搜索按钮
-    document.getElementById('clearAdvancedSearchBtn').addEventListener('click', function() {
-        clearAdvancedSearch();
-    });
-    
-    // 清除快速过滤按钮
-    document.getElementById('clearQuickFilterBtn').addEventListener('click', function() {
-        clearQuickFilter();
-    });
-    
-    // 导出日志按钮
-    document.getElementById('exportLogsBtn').addEventListener('click', function() {
-        exportLogs();
-    });
-    
-    // 清空所有日志按钮
-    document.getElementById('clearAllLogsBtn').addEventListener('click', function() {
-        clearAllLogs();
-    });
-    
-    // Webhook搜索功能
-    document.getElementById('webhookSearch').addEventListener('input', function() {
-        webhookSearchFilter = this.value.trim();
-        applyWebhookSearchFilter();
-        toggleClearWebhookSearchBtn();
-    });
-    
-    // 清空Webhook搜索按钮
-    document.getElementById('clearWebhookSearchBtn').addEventListener('click', function() {
-        document.getElementById('webhookSearch').value = '';
-        webhookSearchFilter = '';
-        applyWebhookSearchFilter();
-        toggleClearWebhookSearchBtn();
-    });
-    
-    // 高级搜索按钮
-    document.getElementById('advancedSearchBtn').addEventListener('click', function() {
-        openAdvancedSearchModal();
-    });
-    
-    // 时间范围过滤
-    document.getElementById('applyTimeFilterBtn').addEventListener('click', function() {
-        const startTime = document.getElementById('startTimeFilter').value;
-        const endTime = document.getElementById('endTimeFilter').value;
-        
-        searchFilters.startTime = startTime;
-        searchFilters.endTime = endTime;
-        
-        applySearchFilters();
-        showNotification('已应用时间过滤', 'info');
-    });
-    
-    // 清除时间过滤
-    document.getElementById('clearTimeFilterBtn').addEventListener('click', function() {
-        document.getElementById('startTimeFilter').value = '';
-        document.getElementById('endTimeFilter').value = '';
-        
-        searchFilters.startTime = '';
-        searchFilters.endTime = '';
-        
-        applySearchFilters();
-        showNotification('已清除时间过滤', 'info');
-    });
-    
-    // 主题切换
-    document.getElementById('themeToggleBtn').addEventListener('click', function() {
-        toggleTheme();
-    });
-    
-    // 仪表板配置
-    document.getElementById('dashboardConfigBtn').addEventListener('click', function() {
-        openDashboardConfig();
-    });
-    
-    // 显示统计图表
-    document.getElementById('showStatsBtn').addEventListener('click', function() {
-        showStatsSection();
-    });
-    
-    // 关闭统计图表
-    document.getElementById('closeStatsBtn').addEventListener('click', function() {
-        hideStatsSection();
-    });
-    
-    // 仪表板配置相关事件
-    document.getElementById('saveDashboardConfig').addEventListener('click', function() {
-        saveDashboardConfig();
-    });
-    
-    document.getElementById('resetDashboardConfig').addEventListener('click', function() {
-        resetDashboardConfig();
-    });
-    
-    document.getElementById('cancelDashboardConfig').addEventListener('click', function() {
-        closeDashboardConfig();
-    });
-    
-    // 高级搜索模态框相关事件
-    document.getElementById('saveSearchCondition').addEventListener('click', function() {
-        saveSearchCondition();
-    });
-    
-    document.getElementById('applyAdvancedSearch').addEventListener('click', function() {
-        applyAdvancedSearch();
-    });
-    
-    document.getElementById('resetAdvancedSearch').addEventListener('click', function() {
-        resetAdvancedSearch();
-    });
-    
-    document.getElementById('cancelAdvancedSearch').addEventListener('click', function() {
-        closeAdvancedSearchModal();
-    });
-    
-    document.getElementById('addSearchCondition').addEventListener('click', function() {
-        addSearchCondition();
-    });
-    
-    document.getElementById('clearSearchHistory').addEventListener('click', function() {
-        clearSearchHistory();
-    });
-    
-    // 高级搜索相关控件事件
-    document.getElementById('enableRegexSearch').addEventListener('change', function() {
-        toggleRegexHelp();
-    });
-    
-    // 快速过滤按钮
-    document.getElementById('quickFilterBtn').addEventListener('click', function() {
-        openQuickFilterModal();
-    });
-    
-    // 快速过滤模态框相关事件
-    document.getElementById('applyQuickFilter').addEventListener('click', function() {
-        applyQuickFilter();
-    });
-    
-    document.getElementById('clearQuickFilter').addEventListener('click', function() {
-        clearQuickFilter();
-    });
-    
-    document.getElementById('cancelQuickFilter').addEventListener('click', function() {
-        closeQuickFilterModal();
-    });
-    
-    document.getElementById('addCustomFilter').addEventListener('click', function() {
-        addCustomFilter();
-    });
-    
-    document.getElementById('searchOperator').addEventListener('change', function() {
-        updateSearchOperator();
-    });
 }
 
 // 加载Webhook列表
 async function loadWebhooks() {
     try {
-        console.log('正在加载Webhook列表...');
         const response = await fetch('/api/webhooks');
-        console.log('Webhook列表响应状态:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('接收到的Webhook数据:', data);
-        
-        if (data.webhooks) {
-            // 新格式：包含内存信息
-            allWebhooks = data.webhooks;
-            updateMemoryDisplay(data.memoryInfo);
+        if (response.ok) {
+            const data = await response.json();
+            webhooks = data;
+            allWebhooks = [...data]; // 创建副本用于搜索
+            updateWebhookList();
+            console.log(`📋 加载了 ${webhooks.length} 个Webhook`);
         } else {
-            // 兼容旧格式
-            allWebhooks = data;
+            throw new Error('加载Webhook失败');
         }
-        
-        console.log('Webhook列表加载成功，共', allWebhooks.length, '个');
-        applyWebhookSearchFilter();
-        updateWebhookFilter();
     } catch (error) {
-        console.error('加载Webhook列表失败:', error);
-        showNotification(`加载Webhook列表失败: ${error.message}`, 'error');
-        
-        // 显示错误信息
-        const container = document.getElementById('webhookContainer');
+        console.error('加载Webhook错误:', error);
+        showNotification('加载Webhook失败', 'error');
+    }
+}
+
+// 更新Webhook列表显示
+function updateWebhookList() {
+    const container = document.getElementById('webhookList');
+    if (!container) return;
+    
+    // 应用搜索过滤
+    let filteredWebhooks = webhookSearchFilter ? 
+        allWebhooks.filter(webhook => 
+            webhook.name.toLowerCase().includes(webhookSearchFilter.toLowerCase()) ||
+            webhook.url.toLowerCase().includes(webhookSearchFilter.toLowerCase())
+        ) : webhooks;
+    
+    container.innerHTML = '';
+    
+    if (filteredWebhooks.length === 0) {
         container.innerHTML = `
-            <div class="no-logs">
-                <div style="color: #e74c3c; margin-bottom: 10px;">❌ 加载失败</div>
-                <div style="font-size: 14px; color: #7f8c8d;">错误信息: ${error.message}</div>
-                <div style="font-size: 12px; color: #95a5a6; margin-top: 10px;">请检查服务器是否正常运行</div>
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <div class="empty-text">暂无Webhook</div>
+                <button class="ant-btn ant-btn-primary" onclick="openWebhookModal()">创建第一个Webhook</button>
             </div>
         `;
-    }
-}
-
-// 开始内存监控
-function startMemoryMonitoring() {
-    // 每30秒更新一次内存信息
-    setInterval(updateSystemStatus, 30000);
-    // 立即更新一次
-    updateSystemStatus();
-}
-
-// 更新系统状态
-async function updateSystemStatus() {
-    try {
-        const response = await fetch('/api/system/status');
-        const data = await response.json();
-        updateMemoryDisplay(data.memory);
-        checkMemoryWarning(data.memory.heapUsed, data.totalLogs);
-    } catch (error) {
-        console.error('获取系统状态失败:', error);
-    }
-}
-
-// 更新内存显示
-function updateMemoryDisplay(memoryInfo) {
-    if (!memoryInfo) return;
-    
-    const memoryValueEl = document.getElementById('memoryValue');
-    const heapUsed = memoryInfo.heapUsed;
-    
-    memoryValueEl.textContent = heapUsed + ' MB';
-    
-    // 根据内存使用情况设置样式
-    memoryValueEl.className = 'memory-value';
-    if (heapUsed > 200) {
-        memoryValueEl.classList.add('danger');
-    } else if (heapUsed > 100) {
-        memoryValueEl.classList.add('warning');
-    }
-}
-
-// 检查内存警告
-function checkMemoryWarning(heapUsed, totalLogs) {
-    const memoryWarning = document.getElementById('memoryWarning');
-    const clearAllBtn = document.getElementById('clearAllLogsBtn');
-    
-    // 当内存使用超过150MB或日志数量超过5000条时显示警告
-    if (heapUsed > 150 || totalLogs > 5000) {
-        memoryWarning.style.display = 'inline';
-        clearAllBtn.style.display = 'inline-block';
-        
-        if (heapUsed > 200) {
-            showNotification('内存使用过高(' + heapUsed + 'MB)，建议清理日志！', 'warning');
-        }
-    } else {
-        memoryWarning.style.display = 'none';
-        clearAllBtn.style.display = 'none';
-    }
-}
-
-// 清理所有日志
-async function clearAllLogs() {
-    if (!confirm('确定要清理所有Webhook的日志吗？这将释放内存空间，但所有历史记录将丢失。')) {
         return;
     }
     
-    try {
-        // 获取所有webhook并清空它们的日志
-        const clearPromises = webhooks.map(webhook => 
-            fetch(`/api/webhooks/${webhook.id}/logs`, { method: 'DELETE' })
-        );
-        
-        await Promise.all(clearPromises);
-        
-        // 清空前端缓存
-        logs = [];
-        allLogs = [];
-        renderLogs();
-        
-        // 重新加载数据
-        await loadWebhooks();
-        await updateSystemStatus();
-        
-        showNotification('所有日志已清理完成，内存已释放', 'success');
-    } catch (error) {
-        console.error('清理日志失败:', error);
-        showNotification('清理日志失败', 'error');
-    }
+    filteredWebhooks.forEach(webhook => {
+        const item = createWebhookItem(webhook);
+        container.appendChild(item);
+    });
 }
 
-// 应用Webhook搜索过滤器
-function applyWebhookSearchFilter() {
-    if (!webhookSearchFilter) {
-        webhooks = [...allWebhooks];
-    } else {
-        webhooks = allWebhooks.filter(webhook => 
-            webhook.name.toLowerCase().includes(webhookSearchFilter.toLowerCase())
-        );
-    }
+// 创建Webhook项目元素
+function createWebhookItem(webhook) {
+    const div = document.createElement('div');
+    div.className = `webhook-item ${selectedWebhookFilter === webhook.id ? 'active' : ''}`;
+    div.onclick = () => selectWebhook(webhook.id);
     
-    renderWebhooks();
-    updateSearchResultInfo();
-}
-
-// 切换清空搜索按钮显示
-function toggleClearWebhookSearchBtn() {
-    const clearBtn = document.getElementById('clearWebhookSearchBtn');
-    if (webhookSearchFilter) {
-        clearBtn.style.display = 'inline-block';
-    } else {
-        clearBtn.style.display = 'none';
-    }
-}
-
-// 更新搜索结果信息
-function updateSearchResultInfo() {
-    if (webhookSearchFilter && webhooks.length === 0) {
-        return true; // 表示没有搜索结果
-    }
-    return false;
-}
-
-// 渲染Webhook列表
-function renderWebhooks() {
-    const container = document.getElementById('webhookContainer');
+    const statusClass = webhook.active ? 'status-active' : 'status-inactive';
+    const statusText = webhook.active ? '活跃' : '暂停';
     
-    // 检查搜索结果
-    if (updateSearchResultInfo()) {
-        return;
-    }
-    
-    if (webhooks.length === 0) {
-        const message = webhookSearchFilter ? 
-            '未找到匹配的Webhook' : 
-            '暂无Webhook，点击新建按钮创建第一个';
-        container.innerHTML = `<div class="no-logs">${message}</div>`;
-        return;
-    }
-    
-    // 生成搜索结果信息
-    let searchInfoHtml = '';
-    if (webhookSearchFilter && webhooks.length > 0) {
-        searchInfoHtml = `
-            <div class="search-result-info">
-                🔍 找到 <strong>${webhooks.length}</strong> 个匹配的Webhook，搜索词: <span class="search-term">"${escapeHtml(webhookSearchFilter)}"</span>
-            </div>
-        `;
-    }
-    
-    // 生成webhook列表
-    const webhookListHtml = webhooks.map(webhook => `
-        <div class="webhook-item ${selectedWebhookFilter === webhook.id ? 'selected' : ''}" 
-             onclick="selectWebhook('${webhook.id}')" data-webhook-id="${webhook.id}">
-            <div class="webhook-info">
-                <h4>${highlightSearchTerm(escapeHtml(webhook.name), webhookSearchFilter, true)}</h4>
-                <div class="webhook-url-compact">
-                    /webhook/${webhook.path}
-                    <button class="btn btn-small btn-secondary" onclick="event.stopPropagation(); copyToClipboard('${window.location.origin}/webhook/${webhook.path}')">复制</button>
-                </div>
-                ${webhook.description ? `<div class="webhook-description">${escapeHtml(webhook.description)}</div>` : ''}
-            </div>
-            
-            <div class="webhook-status-compact">
-                <span class="status-badge ${webhook.enabled ? 'status-enabled' : 'status-disabled'}">
-                    ${webhook.enabled ? '启用' : '禁用'}
-                </span>
-                <span class="webhook-count">共 ${webhook.logCount || 0} 条</span>
-            </div>
-            
-            ${getTypeStatsInfoCompact(webhook)}
-            
-            <div class="webhook-actions-compact">
-                <button class="btn btn-small btn-primary" onclick="event.stopPropagation(); editWebhook('${webhook.id}')">编辑</button>
-                <button class="btn btn-small ${webhook.enabled ? 'btn-warning' : 'btn-success'}" 
-                        onclick="event.stopPropagation(); toggleWebhook('${webhook.id}', ${!webhook.enabled})">
-                    ${webhook.enabled ? '禁用' : '启用'}
-                </button>
-                <button class="btn btn-small btn-danger" onclick="event.stopPropagation(); deleteWebhook('${webhook.id}')">删除</button>
-            </div>
+    div.innerHTML = `
+        <div class="webhook-header">
+            <div class="webhook-name">${webhook.name}</div>
+            <div class="webhook-status ${statusClass}">${statusText}</div>
         </div>
-    `).join('');
+        <div class="webhook-url">${webhook.url}</div>
+        <div class="webhook-meta">
+            <span class="webhook-method">${webhook.method || 'POST'}</span>
+            <span class="webhook-created">创建于 ${new Date(webhook.createdAt).toLocaleDateString()}</span>
+        </div>
+        <div class="webhook-actions">
+            <button class="ant-btn ant-btn-sm" onclick="event.stopPropagation(); editWebhook('${webhook.id}')">
+                <span class="anticon">✏️</span>
+            </button>
+            <button class="ant-btn ant-btn-sm" onclick="event.stopPropagation(); copyWebhookUrl('${webhook.url}')">
+                <span class="anticon">📋</span>
+            </button>
+            <button class="ant-btn ant-btn-sm ant-btn-danger" onclick="event.stopPropagation(); deleteWebhook('${webhook.id}')">
+                <span class="anticon">🗑️</span>
+            </button>
+        </div>
+    `;
     
-    container.innerHTML = searchInfoHtml + webhookListHtml;
-}
-
-// 紧凑版类型统计信息
-function getTypeStatsInfoCompact(webhook) {
-    if (!webhook.typeStats || Object.keys(webhook.typeStats).length === 0) {
-        return '';
-    }
-    
-    const typeStatsHtml = Object.entries(webhook.typeStats).slice(0, 3).map(([type, count]) => 
-        `<span class="type-badge type-${type}">${type}:${count}</span>`
-    ).join(' ');
-    
-    const moreCount = Object.keys(webhook.typeStats).length - 3;
-    const moreText = moreCount > 0 ? ` +${moreCount}种` : '';
-    
-    return `<div class="webhook-type-stats-compact">${typeStatsHtml}${moreText}</div>`;
+    return div;
 }
 
 // 选择Webhook
-function selectWebhook(id) {
-    // 更新选中状态
-    document.querySelectorAll('.webhook-item').forEach(item => {
-        item.classList.remove('selected');
-    });
-    document.querySelector(`[data-webhook-id="${id}"]`).classList.add('selected');
-    
-    // 加载该Webhook的日志
-    selectedWebhookFilter = id;
-    selectedMessageTypeFilter = 'all';
-    document.getElementById('webhookFilter').value = id;
-    document.getElementById('messageTypeFilter').value = 'all';
-    
-    loadLogsForWebhook();
+function selectWebhook(webhookId) {
+    selectedWebhookFilter = selectedWebhookFilter === webhookId ? '' : webhookId;
+    updateWebhookList();
+    loadLogs();
 }
 
-// 获取消息类型统计信息显示
-function getTypeStatsInfo(webhook) {
-    if (!webhook.typeStats || Object.keys(webhook.typeStats).length === 0) {
-        return '<div class="webhook-type-stats">暂无消息类型统计</div>';
-    }
-    
-    const typeStatsHtml = Object.entries(webhook.typeStats).map(([type, count]) => 
-        `<span class="type-count">
-            <span class="type-badge type-${type}">${type}</span>: ${count}条 (最多保留1000条)
-        </span>`
-    ).join('');
-    
-    return `<div class="webhook-type-stats">${typeStatsHtml}</div>`;
-}
-
-// 获取延时信息显示
-function getDelayInfo(webhook) {
-    if (webhook.delayType === 'none') {
-        return '<div class="webhook-delay">延时: 无</div>';
-    } else if (webhook.delayType === 'fixed') {
-        return `<div class="webhook-delay">延时: 固定 ${webhook.delayValue}毫秒</div>`;
-    } else if (webhook.delayType === 'random') {
-        return `<div class="webhook-delay">延时: 随机 ${webhook.delayMin}-${webhook.delayMax}毫秒</div>`;
-    }
-    return '';
-}
-
-// 加载指定Webhook的日志
-async function loadLogsForWebhook() {
-    if (!selectedWebhookFilter) {
-        logs = [];
-        allLogs = [];
-        currentTypeStats = {};
-        renderLogs();
-        updateMessageTypeFilter();
-        return;
-    }
-    
+// 加载日志
+async function loadLogs() {
     try {
-        const url = `/api/webhooks/${selectedWebhookFilter}/logs?type=${selectedMessageTypeFilter}`;
-        console.log('正在加载日志，URL:', url);
+        let url = '/api/logs';
+        const params = new URLSearchParams();
+        
+        if (selectedWebhookFilter) {
+            params.append('webhookId', selectedWebhookFilter);
+        }
+        
+        if (searchFilters.tenantId) {
+            params.append('tenantId', searchFilters.tenantId);
+        }
+        
+        if (searchFilters.uniqueId) {
+            params.append('uniqueId', searchFilters.uniqueId);
+        }
+        
+        if (searchFilters.startTime) {
+            params.append('startTime', searchFilters.startTime);
+        }
+        
+        if (searchFilters.endTime) {
+            params.append('endTime', searchFilters.endTime);
+        }
+        
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
         
         const response = await fetch(url);
-        console.log('响应状态:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (response.ok) {
+            const data = await response.json();
+            logs = data;
+            allLogs = [...data]; // 创建副本用于搜索
+            updateLogDisplay();
+            updateStats();
+            console.log(`📊 加载了 ${logs.length} 条日志`);
+        } else {
+            throw new Error('加载日志失败');
         }
-        
-        const data = await response.json();
-        console.log('接收到的日志数据:', data);
-        
-        allLogs = data.logs || [];
-        currentTypeStats = data.typeStats || {};
-        
-        // 清除高级搜索状态
-        if (currentAdvancedSearch) {
-            currentAdvancedSearch = null;
-            document.getElementById('clearAdvancedSearchBtn').style.display = 'none';
-        }
-        
-        // 清除快速过滤状态
-        if (currentQuickFilter) {
-            currentQuickFilter = null;
-            document.getElementById('clearQuickFilterBtn').style.display = 'none';
-        }
-        
-        applySearchFilters();
-        updateMessageTypeFilter();
-        updateTypeStatsDisplay();
-        
-        console.log('日志加载成功，共', allLogs.length, '条');
     } catch (error) {
-        console.error('加载日志失败:', error);
-        showNotification(`加载日志失败: ${error.message}`, 'error');
-        
-        // 显示详细错误信息
-        const container = document.getElementById('logsContainer');
+        console.error('加载日志错误:', error);
+        showNotification('加载日志失败', 'error');
+    }
+}
+
+// 更新日志显示
+function updateLogDisplay() {
+    // 应用当前的搜索条件
+    let filteredLogs = logs;
+    
+    // 应用高级搜索
+    if (currentAdvancedSearch) {
+        filteredLogs = filteredLogs.filter(log => {
+            return evaluateConditions(log, currentAdvancedSearch);
+        });
+    }
+    
+    // 应用快速过滤
+    if (currentQuickFilter) {
+        filteredLogs = filteredLogs.filter(log => {
+            return evaluateConditions(log, currentQuickFilter.conditions);
+        });
+    }
+    
+    displayLogs(filteredLogs);
+}
+
+// 显示日志
+function displayLogs(logsToDisplay) {
+    const container = document.getElementById('logsList');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (logsToDisplay.length === 0) {
         container.innerHTML = `
-            <div class="no-logs">
-                <div style="color: #e74c3c; margin-bottom: 10px;">❌ 加载日志失败</div>
-                <div style="font-size: 14px; color: #7f8c8d;">错误信息: ${error.message}</div>
-                <div style="font-size: 12px; color: #95a5a6; margin-top: 10px;">请检查网络连接或刷新页面重试</div>
+            <div class="empty-state">
+                <div class="empty-icon">📄</div>
+                <div class="empty-text">暂无日志记录</div>
             </div>
         `;
-    }
-}
-
-// 应用搜索过滤器
-function applySearchFilters() {
-    // 清除高级搜索状态
-    if (currentAdvancedSearch) {
-        currentAdvancedSearch = null;
-        document.getElementById('clearAdvancedSearchBtn').style.display = 'none';
-    }
-    
-    // 清除快速过滤状态
-    if (currentQuickFilter) {
-        currentQuickFilter = null;
-        document.getElementById('clearQuickFilterBtn').style.display = 'none';
-    }
-    
-    logs = allLogs.filter(log => {
-        // 检查 tenantId 搜索
-        if (searchFilters.tenantId) {
-            const tenantId = extractFieldFromLog(log, 'tenantId');
-            if (!tenantId || !tenantId.toString().toLowerCase().includes(searchFilters.tenantId.toLowerCase())) {
-                return false;
-            }
-        }
-        
-        // 检查 uniqueId 搜索
-        if (searchFilters.uniqueId) {
-            const uniqueId = extractFieldFromLog(log, 'uniqueId');
-            if (!uniqueId || !uniqueId.toString().toLowerCase().includes(searchFilters.uniqueId.toLowerCase())) {
-                return false;
-            }
-        }
-        
-        // 检查时间范围
-        if (searchFilters.startTime || searchFilters.endTime) {
-            const logTime = new Date(log.timestamp);
-            
-            if (searchFilters.startTime) {
-                const startTime = new Date(searchFilters.startTime);
-                if (logTime < startTime) {
-                    return false;
-                }
-            }
-            
-            if (searchFilters.endTime) {
-                const endTime = new Date(searchFilters.endTime);
-                if (logTime > endTime) {
-                    return false;
-                }
-            }
-        }
-        
-        return true;
-    });
-    
-    renderLogs();
-}
-
-// 从日志中提取字段值
-function extractFieldFromLog(log, fieldName) {
-    // 首先检查请求体
-    if (log.body && typeof log.body === 'object' && log.body[fieldName]) {
-        return log.body[fieldName];
-    }
-    
-    // 检查查询参数
-    if (log.query && log.query[fieldName]) {
-        return log.query[fieldName];
-    }
-    
-    // 检查请求头
-    if (log.headers && log.headers[fieldName.toLowerCase()]) {
-        return log.headers[fieldName.toLowerCase()];
-    }
-    
-    return null;
-}
-
-// 更新消息类型过滤器
-function updateMessageTypeFilter() {
-    const select = document.getElementById('messageTypeFilter');
-    const currentValue = select.value;
-    
-    let options = '<option value="all">所有类型</option>';
-    
-    Object.keys(currentTypeStats).forEach(type => {
-        options += `<option value="${type}">${type} (${currentTypeStats[type]}条)</option>`;
-    });
-    
-    select.innerHTML = options;
-    
-    if (currentValue && currentTypeStats[currentValue]) {
-        select.value = currentValue;
-    } else {
-        selectedMessageTypeFilter = 'all';
-    }
-}
-
-// 更新类型统计显示
-function updateTypeStatsDisplay() {
-    const container = document.getElementById('typeStats');
-    
-    if (Object.keys(currentTypeStats).length === 0) {
-        container.innerHTML = '';
         return;
     }
     
-    const statsHtml = Object.entries(currentTypeStats).map(([type, count]) => 
-        `<span class="type-badge type-${type}">${type}: ${count}</span>`
-    ).join('');
-    
-    container.innerHTML = statsHtml;
+    logsToDisplay.forEach(log => {
+        const item = createLogItem(log);
+        container.appendChild(item);
+    });
 }
 
-// 更新Webhook过滤器选项
-function updateWebhookFilter() {
-    const select = document.getElementById('webhookFilter');
-    const currentValue = select.value;
+// 创建日志项目元素
+function createLogItem(log) {
+    const div = document.createElement('div');
+    div.className = 'log-item';
+    div.onclick = () => showLogDetails(log);
     
-    select.innerHTML = '<option value="">所有Webhook</option>' +
-        webhooks.map(webhook => 
-            `<option value="${webhook.id}">${escapeHtml(webhook.name)}</option>`
-        ).join('');
+    const statusClass = getStatusClass(log.statusCode);
+    const methodClass = `method-${(log.method || 'POST').toLowerCase()}`;
     
-    if (currentValue && webhooks.find(w => w.id === currentValue)) {
-        select.value = currentValue;
-    }
+    div.innerHTML = `
+        <div class="log-header">
+            <div class="log-status ${statusClass}">${log.statusCode || 'N/A'}</div>
+            <div class="log-method ${methodClass}">${log.method || 'POST'}</div>
+            <div class="log-time">${new Date(log.timestamp).toLocaleString()}</div>
+        </div>
+        <div class="log-content">
+            <div class="log-url">${log.url || 'N/A'}</div>
+            <div class="log-meta">
+                ${log.tenantId ? `<span class="log-tenant">Tenant: ${log.tenantId}</span>` : ''}
+                ${log.uniqueId ? `<span class="log-unique">ID: ${log.uniqueId}</span>` : ''}
+                ${log.responseTime ? `<span class="log-response-time">${log.responseTime}ms</span>` : ''}
+            </div>
+        </div>
+    `;
+    
+    return div;
+}
+
+// 获取状态样式类
+function getStatusClass(statusCode) {
+    if (!statusCode) return 'status-unknown';
+    if (statusCode >= 200 && statusCode < 300) return 'status-success';
+    if (statusCode >= 300 && statusCode < 400) return 'status-redirect';
+    if (statusCode >= 400 && statusCode < 500) return 'status-client-error';
+    if (statusCode >= 500) return 'status-server-error';
+    return 'status-unknown';
+}
+
+// 显示日志详情
+function showLogDetails(log) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>日志详情</h3>
+                <button class="modal-close" onclick="this.parentElement.parentElement.parentElement.remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="log-details">
+                    <div class="detail-section">
+                        <h4>基本信息</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>状态码:</label>
+                                <span class="${getStatusClass(log.statusCode)}">${log.statusCode || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>请求方法:</label>
+                                <span>${log.method || 'POST'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>URL:</label>
+                                <span>${log.url || 'N/A'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>时间:</label>
+                                <span>${new Date(log.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>响应时间:</label>
+                                <span>${log.responseTime || 'N/A'}ms</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>IP地址:</label>
+                                <span>${log.ip || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${log.tenantId || log.uniqueId ? `
+                        <div class="detail-section">
+                            <h4>标识信息</h4>
+                            <div class="detail-grid">
+                                ${log.tenantId ? `
+                                    <div class="detail-item">
+                                        <label>Tenant ID:</label>
+                                        <span>${log.tenantId}</span>
+                                    </div>
+                                ` : ''}
+                                ${log.uniqueId ? `
+                                    <div class="detail-item">
+                                        <label>Unique ID:</label>
+                                        <span>${log.uniqueId}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${log.headers ? `
+                        <div class="detail-section">
+                            <h4>请求头</h4>
+                            <pre class="detail-code">${JSON.stringify(log.headers, null, 2)}</pre>
+                        </div>
+                    ` : ''}
+                    
+                    ${log.body ? `
+                        <div class="detail-section">
+                            <h4>请求体</h4>
+                            <pre class="detail-code">${typeof log.body === 'string' ? log.body : JSON.stringify(log.body, null, 2)}</pre>
+                        </div>
+                    ` : ''}
+                    
+                    ${log.response ? `
+                        <div class="detail-section">
+                            <h4>响应内容</h4>
+                            <pre class="detail-code">${typeof log.response === 'string' ? log.response : JSON.stringify(log.response, null, 2)}</pre>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="ant-btn ant-btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()">关闭</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+// 更新统计信息
+function updateStats() {
+    const totalLogs = logs.length;
+    const successLogs = logs.filter(log => log.statusCode >= 200 && log.statusCode < 300).length;
+    const errorLogs = logs.filter(log => log.statusCode >= 400).length;
+    const avgResponseTime = logs.length > 0 ? 
+        logs.reduce((sum, log) => sum + (log.responseTime || 0), 0) / logs.length : 0;
+    
+    // 更新统计显示
+    document.getElementById('totalRequests').textContent = totalLogs;
+    document.getElementById('successRate').textContent = totalLogs > 0 ? 
+        ((successLogs / totalLogs) * 100).toFixed(1) + '%' : '0%';
+    document.getElementById('errorCount').textContent = errorLogs;
+    document.getElementById('avgResponseTime').textContent = avgResponseTime.toFixed(0) + 'ms';
+}
+
+// 绑定事件
+function bindEvents() {
+    // 创建Webhook按钮
+    document.getElementById('createBtn').addEventListener('click', openWebhookModal);
+    document.getElementById('createBtn2').addEventListener('click', openWebhookModal);
+    
+    // 搜索框
+    document.getElementById('webhookSearch').addEventListener('input', function(e) {
+        webhookSearchFilter = e.target.value;
+        updateWebhookList();
+    });
+    
+    // 统计图表按钮
+    document.getElementById('showStatsBtn').addEventListener('click', toggleStats);
+    
+    // 导出Excel按钮
+    document.getElementById('exportBtn').addEventListener('click', exportExcel);
+    
+    // 高级搜索按钮
+    document.getElementById('advancedSearchBtn').addEventListener('click', function() {
+        document.getElementById('advancedSearchPanel').style.display = 'block';
+    });
+    
+    // 搜索过滤器
+    document.getElementById('tenantIdFilter').addEventListener('input', function(e) {
+        searchFilters.tenantId = e.target.value;
+        loadLogs();
+    });
+    
+    document.getElementById('uniqueIdFilter').addEventListener('input', function(e) {
+        searchFilters.uniqueId = e.target.value;
+        loadLogs();
+    });
+    
+    document.getElementById('startTimeFilter').addEventListener('change', function(e) {
+        searchFilters.startTime = e.target.value;
+        loadLogs();
+    });
+    
+    document.getElementById('endTimeFilter').addEventListener('change', function(e) {
+        searchFilters.endTime = e.target.value;
+        loadLogs();
+    });
+    
+    // 刷新按钮
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+        loadWebhooks();
+        loadLogs();
+        showNotification('数据已刷新', 'success');
+    });
 }
 
 // 打开Webhook模态框
 function openWebhookModal(webhook = null) {
     currentEditingWebhook = webhook;
-    const modal = document.getElementById('webhookModal');
-    const title = document.getElementById('modalTitle');
-    const form = document.getElementById('webhookForm');
     
-    title.textContent = webhook ? '编辑Webhook' : '创建Webhook';
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>${webhook ? '编辑Webhook' : '创建Webhook'}</h3>
+                <button class="modal-close" onclick="this.parentElement.parentElement.parentElement.remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="webhookForm">
+                    <div class="form-group">
+                        <label for="webhookName">名称 *</label>
+                        <input type="text" id="webhookName" class="ant-input" required 
+                               value="${webhook ? webhook.name : ''}" placeholder="输入Webhook名称">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="webhookUrl">URL *</label>
+                        <input type="url" id="webhookUrl" class="ant-input" required 
+                               value="${webhook ? webhook.url : ''}" placeholder="https://example.com/webhook">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="webhookMethod">请求方法</label>
+                        <select id="webhookMethod" class="ant-select">
+                            <option value="POST" ${!webhook || webhook.method === 'POST' ? 'selected' : ''}>POST</option>
+                            <option value="GET" ${webhook && webhook.method === 'GET' ? 'selected' : ''}>GET</option>
+                            <option value="PUT" ${webhook && webhook.method === 'PUT' ? 'selected' : ''}>PUT</option>
+                            <option value="DELETE" ${webhook && webhook.method === 'DELETE' ? 'selected' : ''}>DELETE</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="webhookHeaders">请求头 (JSON格式)</label>
+                        <textarea id="webhookHeaders" class="ant-input" rows="4" 
+                                  placeholder='{"Content-Type": "application/json"}'>${webhook && webhook.headers ? JSON.stringify(webhook.headers, null, 2) : ''}</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="webhookActive" ${!webhook || webhook.active ? 'checked' : ''}>
+                            启用此Webhook
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="ant-btn ant-btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()">取消</button>
+                <button class="ant-btn ant-btn-primary" onclick="saveWebhook()">${webhook ? '更新' : '创建'}</button>
+            </div>
+        </div>
+    `;
     
-    if (webhook) {
-        document.getElementById('webhookName').value = webhook.name;
-        document.getElementById('webhookDescription').value = webhook.description || '';
-        document.getElementById('delayType').value = webhook.delayType || 'none';
-        document.getElementById('delayValue').value = webhook.delayValue || 1;
-        document.getElementById('delayMin').value = webhook.delayMin || 1;
-        document.getElementById('delayMax').value = webhook.delayMax || 5;
-        
-        // 编辑模式下隐藏路径选择
-        document.getElementById('pathType').closest('.form-group').style.display = 'none';
-        document.getElementById('customPathGroup').style.display = 'none';
-    } else {
-        form.reset();
-        document.getElementById('pathType').closest('.form-group').style.display = 'block';
-        document.getElementById('pathType').value = 'auto';
-        document.getElementById('delayType').value = 'none';
-    }
-    
-    toggleCustomPath();
-    toggleDelayOptions();
-    modal.style.display = 'block';
-}
-
-// 切换自定义路径显示
-function toggleCustomPath() {
-    const pathType = document.getElementById('pathType').value;
-    const customPathGroup = document.getElementById('customPathGroup');
-    
-    if (pathType === 'custom') {
-        customPathGroup.style.display = 'block';
-        document.getElementById('customPath').required = true;
-    } else {
-        customPathGroup.style.display = 'none';
-        document.getElementById('customPath').required = false;
-    }
-}
-
-// 切换延时选项显示
-function toggleDelayOptions() {
-    const delayType = document.getElementById('delayType').value;
-    const fixedGroup = document.getElementById('fixedDelayGroup');
-    const randomGroup = document.getElementById('randomDelayGroup');
-    
-    fixedGroup.style.display = delayType === 'fixed' ? 'block' : 'none';
-    randomGroup.style.display = delayType === 'random' ? 'block' : 'none';
+    document.body.appendChild(modal);
 }
 
 // 保存Webhook
 async function saveWebhook() {
-    // 验证延时输入
-    const delayType = document.getElementById('delayType').value;
-    let delayValue = 0, delayMin = 0, delayMax = 0;
+    const form = document.getElementById('webhookForm');
+    const formData = new FormData(form);
     
-    if (delayType === 'fixed') {
-        delayValue = parseInt(document.getElementById('delayValue').value);
-        if (!delayValue || delayValue < 1 || delayValue > 100000) {
-            showNotification('延时时间必须是1-100000之间的正整数', 'error');
-            return;
-        }
-    } else if (delayType === 'random') {
-        delayMin = parseInt(document.getElementById('delayMin').value);
-        delayMax = parseInt(document.getElementById('delayMax').value);
-        
-        if (!delayMin || delayMin < 1 || delayMin > 100000) {
-            showNotification('最小延时必须是1-100000之间的正整数', 'error');
-            return;
-        }
-        if (!delayMax || delayMax < 1 || delayMax > 100000) {
-            showNotification('最大延时必须是1-100000之间的正整数', 'error');
-            return;
-        }
-        if (delayMin >= delayMax) {
-            showNotification('最小延时必须小于最大延时', 'error');
-            return;
-        }
-    }
-    
-    const formData = {
+    const webhookData = {
         name: document.getElementById('webhookName').value,
-        description: document.getElementById('webhookDescription').value,
-        delayType: delayType,
-        delayValue: delayValue,
-        delayMin: delayMin,
-        delayMax: delayMax
+        url: document.getElementById('webhookUrl').value,
+        method: document.getElementById('webhookMethod').value,
+        active: document.getElementById('webhookActive').checked
     };
     
-    if (!currentEditingWebhook) {
-        // 创建新的Webhook
-        const pathType = document.getElementById('pathType').value;
-        if (pathType === 'custom') {
-            formData.customPath = document.getElementById('customPath').value;
+    // 解析请求头
+    const headersText = document.getElementById('webhookHeaders').value.trim();
+    if (headersText) {
+        try {
+            webhookData.headers = JSON.parse(headersText);
+        } catch (error) {
+            showNotification('请求头格式错误，请使用有效的JSON格式', 'error');
+            return;
         }
-    } else {
-        // 编辑现有Webhook
-        formData.enabled = currentEditingWebhook.enabled;
     }
     
     try {
-        const url = currentEditingWebhook 
-            ? `/api/webhooks/${currentEditingWebhook.id}`
-            : '/api/webhooks';
+        const url = currentEditingWebhook ? 
+            `/api/webhooks/${currentEditingWebhook.id}` : 
+            '/api/webhooks';
         const method = currentEditingWebhook ? 'PUT' : 'POST';
         
         const response = await fetch(url, {
@@ -1090,515 +1080,140 @@ async function saveWebhook() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(webhookData)
         });
         
         if (response.ok) {
-            closeModal(document.getElementById('webhookModal'));
+            const result = await response.json();
+            showNotification(currentEditingWebhook ? 'Webhook已更新' : 'Webhook已创建', 'success');
+            
+            // 关闭模态框
+            document.querySelector('.modal').remove();
+            
+            // 重新加载列表
             loadWebhooks();
-            showNotification(currentEditingWebhook ? 'Webhook更新成功' : 'Webhook创建成功', 'success');
         } else {
             const error = await response.json();
-            showNotification(error.error || '操作失败', 'error');
+            throw new Error(error.message || '保存失败');
         }
     } catch (error) {
-        console.error('保存Webhook失败:', error);
-        showNotification('保存失败', 'error');
+        console.error('保存Webhook错误:', error);
+        showNotification('保存失败: ' + error.message, 'error');
     }
 }
 
 // 编辑Webhook
-function editWebhook(id) {
-    const webhook = webhooks.find(w => w.id === id);
+function editWebhook(webhookId) {
+    const webhook = webhooks.find(w => w.id === webhookId);
     if (webhook) {
         openWebhookModal(webhook);
     }
 }
 
-// 切换Webhook启用状态
-async function toggleWebhook(id, enabled) {
-    try {
-        const response = await fetch(`/api/webhooks/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ enabled })
-        });
-        
-        if (response.ok) {
-            loadWebhooks();
-            showNotification(`Webhook已${enabled ? '启用' : '禁用'}`, 'success');
-        } else {
-            showNotification('操作失败', 'error');
-        }
-    } catch (error) {
-        console.error('切换Webhook状态失败:', error);
-        showNotification('操作失败', 'error');
-    }
-}
-
 // 删除Webhook
-async function deleteWebhook(id) {
-    if (!confirm('确定要删除这个Webhook吗？此操作不可恢复。')) {
+async function deleteWebhook(webhookId) {
+    if (!confirm('确定要删除这个Webhook吗？')) {
         return;
     }
     
     try {
-        const response = await fetch(`/api/webhooks/${id}`, {
+        const response = await fetch(`/api/webhooks/${webhookId}`, {
             method: 'DELETE'
         });
         
         if (response.ok) {
+            showNotification('Webhook已删除', 'success');
             loadWebhooks();
-            // 从日志中移除相关记录
-            logs = logs.filter(log => log.webhookId !== id);
-            renderLogs();
-            showNotification('Webhook删除成功', 'success');
+            
+            // 如果删除的是当前选中的webhook，清除选择
+            if (selectedWebhookFilter === webhookId) {
+                selectedWebhookFilter = '';
+                loadLogs();
+            }
         } else {
-            showNotification('删除失败', 'error');
+            throw new Error('删除失败');
         }
     } catch (error) {
-        console.error('删除Webhook失败:', error);
+        console.error('删除Webhook错误:', error);
         showNotification('删除失败', 'error');
     }
 }
 
-// 查看日志
-async function viewLogs(id) {
-    selectedWebhookFilter = id;
-    selectedMessageTypeFilter = 'all';
-    document.getElementById('webhookFilter').value = id;
-    document.getElementById('messageTypeFilter').value = 'all';
-    
-    await loadLogsForWebhook();
-    
-    // 滚动到日志区域
-    document.querySelector('.logs-section').scrollIntoView({ 
-        behavior: 'smooth' 
+// 复制Webhook URL
+function copyWebhookUrl(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        showNotification('URL已复制到剪贴板', 'success');
+    }).catch(() => {
+        showNotification('复制失败', 'error');
     });
 }
 
-// 添加日志到UI
-function addLogToUI(log, webhookId) {
-    // 如果当前正在查看这个webhook的日志，重新加载
-    if (selectedWebhookFilter === webhookId) {
-        loadLogsForWebhook();
-    }
+// 切换统计图表显示
+function toggleStats() {
+    const statsSection = document.getElementById('statsSection');
+    const isVisible = statsSection.style.display !== 'none';
     
-    // 重新加载webhook列表以更新统计信息
-    loadWebhooks();
-}
-
-// 渲染日志
-function renderLogs() {
-    const container = document.getElementById('logsContainer');
-    
-    if (logs.length === 0) {
-        const message = (searchFilters.tenantId || searchFilters.uniqueId) ? 
-            '没有找到匹配的日志数据' : '暂无日志数据';
-        container.innerHTML = `<div class="no-logs">${message}</div>`;
-        return;
-    }
-    
-    container.innerHTML = logs.map(log => {
-        const tenantId = extractFieldFromLog(log, 'tenantId');
-        const uniqueId = extractFieldFromLog(log, 'uniqueId');
-        
-        let searchInfo = '';
-        if (tenantId || uniqueId) {
-            const parts = [];
-            if (tenantId) {
-                const highlightedTenantId = highlightSearchTerm(tenantId.toString(), searchFilters.tenantId);
-                parts.push(`tenantId: ${highlightedTenantId}`);
-            }
-            if (uniqueId) {
-                const highlightedUniqueId = highlightSearchTerm(uniqueId.toString(), searchFilters.uniqueId);
-                parts.push(`uniqueId: ${highlightedUniqueId}`);
-            }
-            searchInfo = `<div class="log-search-info">${parts.join(' | ')}</div>`;
-        }
-        
-        return `
-            <div class="log-item" onclick="showLogDetails('${log.id}')">
-                <div class="log-header">
-                    <div>
-                        <span class="log-method method-${log.method}">${log.method}</span>
-                        <span class="log-message-type">
-                            <span class="type-badge type-${log.messageType || 'DEFAULT'}">${log.messageType || 'DEFAULT'}</span>
-                        </span>
-                        <span class="log-timestamp">${formatDateTime(log.timestamp)}</span>
-                    </div>
-                </div>
-                <div class="log-url">${escapeHtml(log.url)}</div>
-                ${searchInfo}
-                <div class="log-preview">
-                    <span>IP: ${log.ip}</span>
-                    <span>Headers: ${Object.keys(log.headers).length}个</span>
-                    <span>Body: ${getBodyPreview(log.body)}</span>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// 高亮搜索词
-function highlightSearchTerm(text, searchTerm, isWebhookSearch = false) {
-    if (!searchTerm) return text;
-    
-    const highlightClass = isWebhookSearch ? 'webhook-search-highlight' : 'search-highlight';
-    const escapedSearchTerm = escapeHtml(searchTerm);
-    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
-    
-    return text.replace(regex, `<span class="${highlightClass}">$1</span>`);
-}
-
-// 导出日志为Excel
-async function exportLogs() {
-    if (!selectedWebhookFilter) {
-        showNotification('请先选择要导出日志的Webhook', 'warning');
-        return;
-    }
-    
-    try {
-        // 构建导出URL
-        let url = `/api/webhooks/${selectedWebhookFilter}/export`;
-        if (selectedMessageTypeFilter !== 'all') {
-            url += `?type=${selectedMessageTypeFilter}`;
-        }
-        
-        showNotification('正在准备导出数据，请稍候...', 'info');
-        
-        // 使用window.open直接下载文件
-        window.open(url, '_blank');
-        
-        showNotification('导出请求已发送，如果数据量较大，可能需要等待几秒钟', 'success');
-    } catch (error) {
-        console.error('导出日志失败:', error);
-        showNotification('导出失败: ' + error.message, 'error');
-    }
-}
-
-// 清空日志
-async function clearLogs() {
-    if (selectedWebhookFilter) {
-        let confirmMessage = '确定要清空该Webhook的';
-        let url = `/api/webhooks/${selectedWebhookFilter}/logs`;
-        
-        if (selectedMessageTypeFilter !== 'all') {
-            confirmMessage += `${selectedMessageTypeFilter}类型的`;
-            url += `?type=${selectedMessageTypeFilter}`;
-        } else {
-            confirmMessage += '所有';
-        }
-        confirmMessage += '日志吗？';
-        
-        if (!confirm(confirmMessage)) {
-            return;
-        }
-        
-        try {
-            const response = await fetch(url, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                await loadLogsForWebhook();
-                await loadWebhooks(); // 更新统计信息
-                showNotification('日志已清空', 'success');
-            } else {
-                showNotification('清空失败', 'error');
-            }
-        } catch (error) {
-            console.error('清空日志失败:', error);
-            showNotification('清空失败', 'error');
-        }
+    if (isVisible) {
+        statsSection.style.display = 'none';
+        document.getElementById('showStatsBtn').innerHTML = '<span class="anticon">📊</span> 统计图表';
     } else {
-        showNotification('请先选择要清空日志的Webhook', 'warning');
+        statsSection.style.display = 'block';
+        document.getElementById('showStatsBtn').innerHTML = '<span class="anticon">📈</span> 隐藏图表';
+        updateCharts();
     }
 }
 
-// 显示日志详情
-function showLogDetails(logId) {
-    const log = logs.find(l => l.id === logId);
-    if (!log) return;
+// 更新图表
+function updateCharts() {
+    if (!logs.length) return;
     
-    const modal = document.getElementById('logModal');
-    
-    // 基本信息
-    document.getElementById('logBasicInfo').innerHTML = `
-        <div class="info-row">
-            <span class="info-label">时间:</span>
-            <span class="info-value">${formatDateTime(log.timestamp)}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">方法:</span>
-            <span class="info-value">${log.method}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">URL:</span>
-            <span class="info-value">${log.url}</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">IP:</span>
-            <span class="info-value">${log.ip}</span>
-        </div>
-    `;
-    
-    // 请求头
-    document.getElementById('logHeaders').textContent = JSON.stringify(log.headers, null, 2);
-    
-    // 请求体
-    const bodyText = typeof log.body === 'object' 
-        ? JSON.stringify(log.body, null, 2)
-        : log.body || '(空)';
-    document.getElementById('logBody').textContent = bodyText;
-    
-    modal.style.display = 'block';
-}
-
-// 显示统计图表区域
-function showStatsSection() {
-    const statsSection = document.getElementById('statsSection');
-    statsSection.style.display = 'block';
-    
-    // 初始化仪表板配置
-    initDashboardConfig();
-    
-    // 初始化图表
-    initCharts();
-    
-    // 加载告警信息
-    loadAlerts();
-}
-
-// 加载告警信息
-async function loadAlerts() {
-    if (!selectedWebhookFilter) {
-        if (allWebhooks.length > 0) {
-            selectedWebhookFilter = allWebhooks[0].id;
-        } else {
-            document.getElementById('alertsContainer').innerHTML = '<div class="no-alerts">暂无告警信息</div>';
-            return;
-        }
-    }
-    
-    try {
-        const response = await fetch(`/api/webhooks/${selectedWebhookFilter}/alerts`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        alerts = data.alerts || [];
-        
-        renderAlerts();
-    } catch (error) {
-        console.error('加载告警信息失败:', error);
-        document.getElementById('alertsContainer').innerHTML = `
-            <div class="no-alerts">
-                <div style="color: #e74c3c; margin-bottom: 10px;">❌ 加载告警信息失败</div>
-                <div style="font-size: 14px; color: #7f8c8d;">错误信息: ${error.message}</div>
-            </div>
-        `;
-    }
-}
-
-// 处理新的告警信息
-function handleNewAlerts(newAlerts, webhookId) {
-    if (webhookId === selectedWebhookFilter) {
-        // 将新告警添加到列表前面
-        alerts = [...newAlerts, ...alerts];
-        
-        // 最多保留100条告警
-        if (alerts.length > 100) {
-            alerts = alerts.slice(0, 100);
-        }
-        
-        // 重新渲染告警列表
-        renderAlerts();
-        
-        // 显示通知
-        newAlerts.forEach(alert => {
-            showNotification(`告警: ${alert.message}`, alert.level);
-        });
-    }
-}
-
-// 渲染告警列表
-function renderAlerts() {
-    const container = document.getElementById('alertsContainer');
-    
-    if (!alerts || alerts.length === 0) {
-        container.innerHTML = '<div class="no-alerts">暂无告警信息</div>';
-        return;
-    }
-    
-    const alertsHtml = alerts.map(alert => `
-        <div class="alert-item">
-            <div class="alert-header">
-                <span class="alert-type alert-type-${alert.type}">${formatAlertType(alert.type)}</span>
-                <span class="alert-timestamp">${formatDateTime(alert.timestamp)}</span>
-            </div>
-            <div class="alert-message">${alert.message}</div>
-            ${alert.details ? `
-                <div class="alert-details">
-                    ${formatAlertDetails(alert.details)}
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-    
-    container.innerHTML = alertsHtml;
-}
-
-// 格式化告警类型
-function formatAlertType(type) {
-    switch (type) {
-        case 'HIGH_FREQUENCY':
-            return '高频请求';
-        case 'ERROR_RATE':
-            return '错误率';
-        default:
-            return type;
-    }
-}
-
-// 格式化告警详情
-function formatAlertDetails(details) {
-    if (!details) return '';
-    
-    if (typeof details === 'object') {
-        return Object.entries(details).map(([key, value]) => {
-            return `${key}: ${value}`;
-        }).join('<br>');
-    }
-    
-    return String(details);
-}
-
-// 隐藏统计图表区域
-function hideStatsSection() {
-    const statsSection = document.getElementById('statsSection');
-    statsSection.style.display = 'none';
-    
-    // 清除刷新定时器
-    if (dashboardRefreshTimer) {
-        clearInterval(dashboardRefreshTimer);
-        dashboardRefreshTimer = null;
-    }
-}
-
-// 初始化图表
-function initCharts() {
-    // 销毁旧图表
-    if (successRateChart) {
-        successRateChart.destroy();
-    }
-    if (responseTimeChart) {
-        responseTimeChart.destroy();
-    }
-    if (requestTrendChart) {
-        requestTrendChart.destroy();
-    }
-    if (ipSourceChart) {
-        ipSourceChart.destroy();
-    }
-    if (userAgentChart) {
-        userAgentChart.destroy();
-    }
-    if (responseTimeDistChart) {
-        responseTimeDistChart.destroy();
-    }
-    if (performanceChart) {
-        performanceChart.destroy();
-    }
-    if (errorTypeChart) {
-        errorTypeChart.destroy();
-    }
-    if (errorTrendChart) {
-        errorTrendChart.destroy();
-    }
-    
-    // 获取当前选中的webhook数据
-    let webhookData = [];
-    if (selectedWebhookFilter) {
-        webhookData = allLogs;
-    } else if (allWebhooks.length > 0) {
-        // 如果没有选中webhook，使用第一个webhook的数据
-        selectedWebhookFilter = allWebhooks[0].id;
-        loadLogsForWebhook().then(() => {
-            webhookData = allLogs;
-            createCharts(webhookData);
-        });
-        return;
-    }
-    
-    createCharts(webhookData);
-}
-
-// 创建图表
-function createCharts(webhookData) {
     // 准备数据
-    const last24Hours = new Date();
-    last24Hours.setHours(last24Hours.getHours() - 24);
+    const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentLogs = logs.filter(log => new Date(log.timestamp) > last24Hours);
     
-    // 按小时分组数据
+    // 按小时分组
     const hourlyData = {};
     for (let i = 0; i < 24; i++) {
-        const hour = new Date(last24Hours);
-        hour.setHours(hour.getHours() + i);
-        const hourKey = hour.toISOString().slice(0, 13);
-        hourlyData[hourKey] = {
+        const hour = new Date(Date.now() - (23 - i) * 60 * 60 * 1000).getHours();
+        hourlyData[hour] = {
             total: 0,
             success: 0,
-            responseTimes: []
+            error: 0,
+            responseTime: []
         };
     }
     
-    // 处理日志数据
-    webhookData.forEach(log => {
-        const logTime = new Date(log.timestamp);
-        if (logTime >= last24Hours) {
-            const hourKey = logTime.toISOString().slice(0, 13);
-            if (hourlyData[hourKey]) {
-                hourlyData[hourKey].total++;
-                
-                // 假设状态码200-299为成功
-                const statusCode = log.body && log.body.statusCode ? log.body.statusCode : 200;
-                if (statusCode >= 200 && statusCode < 300) {
-                    hourlyData[hourKey].success++;
-                }
-                
-                // 记录响应时间
-                const responseTime = log.body && log.body.responseTime ? log.body.responseTime : Math.random() * 100;
-                hourlyData[hourKey].responseTimes.push(responseTime);
+    recentLogs.forEach(log => {
+        const hour = new Date(log.timestamp).getHours();
+        if (hourlyData[hour]) {
+            hourlyData[hour].total++;
+            if (log.statusCode >= 200 && log.statusCode < 300) {
+                hourlyData[hour].success++;
+            } else if (log.statusCode >= 400) {
+                hourlyData[hour].error++;
+            }
+            if (log.responseTime) {
+                hourlyData[hour].responseTime.push(log.responseTime);
             }
         }
     });
     
     // 准备图表数据
-    const labels = Object.keys(hourlyData).map(key => {
-        const date = new Date(key);
-        return `${date.getHours()}:00`;
-    });
-    
-    const successRates = Object.values(hourlyData).map(data => {
-        return data.total > 0 ? (data.success / data.total) * 100 : 0;
-    });
-    
-    const avgResponseTimes = Object.values(hourlyData).map(data => {
-        if (data.responseTimes.length === 0) return 0;
-        const sum = data.responseTimes.reduce((a, b) => a + b, 0);
-        return sum / data.responseTimes.length;
-    });
-    
-    const requestCounts = Object.values(hourlyData).map(data => {
-        return data.total;
-    });
+    const labels = Object.keys(hourlyData).map(hour => `${hour}:00`);
+    const successRates = Object.values(hourlyData).map(data => 
+        data.total > 0 ? (data.success / data.total * 100) : 0
+    );
+    const avgResponseTimes = Object.values(hourlyData).map(data => 
+        data.responseTime.length > 0 ? 
+        data.responseTime.reduce((a, b) => a + b, 0) / data.responseTime.length : 0
+    );
+    const requestCounts = Object.values(hourlyData).map(data => data.total);
     
     // 创建成功率图表
     const successRateCtx = document.getElementById('successRateChart').getContext('2d');
+    if (successRateChart) {
+        successRateChart.destroy();
+    }
     successRateChart = new Chart(successRateCtx, {
         type: 'line',
         data: {
@@ -1606,11 +1221,10 @@ function createCharts(webhookData) {
             datasets: [{
                 label: '成功率 (%)',
                 data: successRates,
-                backgroundColor: 'rgba(39, 174, 96, 0.2)',
-                borderColor: 'rgba(39, 174, 96, 1)',
+                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                borderColor: 'rgba(76, 175, 80, 1)',
                 borderWidth: 2,
-                tension: 0.4,
-                fill: true
+                tension: 0.4
             }]
         },
         options: {
@@ -1635,12 +1249,12 @@ function createCharts(webhookData) {
             plugins: {
                 title: {
                     display: true,
-                    text: '24小时请求成功率'
+                    text: '24小时成功率趋势'
                 },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `成功率: ${context.parsed.y.toFixed(2)}%`;
+                            return `成功率: ${context.parsed.y.toFixed(1)}%`;
                         }
                     }
                 }
@@ -1650,6 +1264,9 @@ function createCharts(webhookData) {
     
     // 创建响应时间图表
     const responseTimeCtx = document.getElementById('responseTimeChart').getContext('2d');
+    if (responseTimeChart) {
+        responseTimeChart.destroy();
+    }
     responseTimeChart = new Chart(responseTimeCtx, {
         type: 'bar',
         data: {
@@ -1698,6 +1315,9 @@ function createCharts(webhookData) {
     
     // 创建请求趋势图
     const requestTrendCtx = document.getElementById('requestTrendChart').getContext('2d');
+    if (requestTrendChart) {
+        requestTrendChart.destroy();
+    }
     requestTrendChart = new Chart(requestTrendCtx, {
         type: 'line',
         data: {
@@ -1745,1128 +1365,98 @@ function createCharts(webhookData) {
             }
         }
     });
-    
-    // 分析来源数据
-    const ipStats = {};
-    const userAgentStats = {};
-    
-    webhookData.forEach(log => {
-        // 统计IP地址
-        const ip = log.ip || 'unknown';
-        ipStats[ip] = (ipStats[ip] || 0) + 1;
-        
-        // 统计User-Agent
-        const userAgent = log.headers && log.headers['user-agent'] ? 
-            parseUserAgent(log.headers['user-agent']) : 'unknown';
-        userAgentStats[userAgent] = (userAgentStats[userAgent] || 0) + 1;
-    });
-    
-    // 准备IP来源图表数据（取前10个）
-    const topIPs = Object.entries(ipStats)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 10);
-    
-    const ipLabels = topIPs.map(([ip]) => ip);
-    const ipCounts = topIPs.map(([,count]) => count);
-    
-    // 创建IP来源图表
-    const ipSourceCtx = document.getElementById('ipSourceChart').getContext('2d');
-    ipSourceChart = new Chart(ipSourceCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ipLabels,
-            datasets: [{
-                data: ipCounts,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.8)',
-                    'rgba(54, 162, 235, 0.8)',
-                    'rgba(255, 205, 86, 0.8)',
-                    'rgba(75, 192, 192, 0.8)',
-                    'rgba(153, 102, 255, 0.8)',
-                    'rgba(255, 159, 64, 0.8)',
-                    'rgba(199, 199, 199, 0.8)',
-                    'rgba(83, 102, 255, 0.8)',
-                    'rgba(255, 99, 255, 0.8)',
-                    'rgba(99, 255, 132, 0.8)'
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Top 10 IP地址来源'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.parsed / total) * 100).toFixed(1);
-                            return `${context.label}: ${context.parsed} (${percentage}%)`;
-                        }
-                    }
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        boxWidth: 12,
-                        font: {
-                            size: 10
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // 准备User-Agent图表数据（取前8个）
-    const topUserAgents = Object.entries(userAgentStats)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 8);
-    
-    const uaLabels = topUserAgents.map(([ua]) => ua);
-    const uaCounts = topUserAgents.map(([,count]) => count);
-    
-    // 创建User-Agent图表
-    const userAgentCtx = document.getElementById('userAgentChart').getContext('2d');
-    userAgentChart = new Chart(userAgentCtx, {
-        type: 'bar',
-        data: {
-            labels: uaLabels,
-            datasets: [{
-                label: '请求数量',
-                data: uaCounts,
-                backgroundColor: 'rgba(255, 159, 64, 0.6)',
-                borderColor: 'rgba(255, 159, 64, 1)',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: '请求数量'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'User-Agent'
-                    }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Top 8 User-Agent来源'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.label}: ${context.parsed.x} 次请求`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // 分析响应时间数据
-    const responseTimes = [];
-    webhookData.forEach(log => {
-        // 从日志中提取响应时间，如果没有则生成模拟数据
-        let responseTime = 0;
-        if (log.body && log.body.responseTime) {
-            responseTime = log.body.responseTime;
-        } else {
-            // 生成模拟响应时间数据（实际项目中应该从真实数据获取）
-            responseTime = Math.random() * 500 + 10; // 10-510ms
-        }
-        responseTimes.push(responseTime);
-    });
-    
-    // 创建响应时间分布区间
-    const distributionRanges = [
-        { label: '0-50ms', min: 0, max: 50, count: 0 },
-        { label: '50-100ms', min: 50, max: 100, count: 0 },
-        { label: '100-200ms', min: 100, max: 200, count: 0 },
-        { label: '200-500ms', min: 200, max: 500, count: 0 },
-        { label: '500ms+', min: 500, max: Infinity, count: 0 }
-    ];
-    
-    // 统计各区间的数量
-    responseTimes.forEach(time => {
-        for (let range of distributionRanges) {
-            if (time >= range.min && time < range.max) {
-                range.count++;
-                break;
-            }
-        }
-    });
-    
-    // 创建响应时间分布图表
-    const responseTimeDistCtx = document.getElementById('responseTimeDistChart').getContext('2d');
-    responseTimeDistChart = new Chart(responseTimeDistCtx, {
-        type: 'bar',
-        data: {
-            labels: distributionRanges.map(r => r.label),
-            datasets: [{
-                label: '请求数量',
-                data: distributionRanges.map(r => r.count),
-                backgroundColor: [
-                    'rgba(39, 174, 96, 0.8)',
-                    'rgba(52, 152, 219, 0.8)',
-                    'rgba(243, 156, 18, 0.8)',
-                    'rgba(230, 126, 34, 0.8)',
-                    'rgba(231, 76, 60, 0.8)'
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: '请求数量'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: '响应时间区间'
-                    }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: '响应时间分布'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = total > 0 ? ((context.parsed.y / total) * 100).toFixed(1) : 0;
-                            return `${context.label}: ${context.parsed.y} 次 (${percentage}%)`;
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // 计算性能指标
-    const avgResponseTime = responseTimes.length > 0 ? 
-        responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length : 0;
-    const p95ResponseTime = responseTimes.length > 0 ? 
-        calculatePercentile(responseTimes, 95) : 0;
-    const p99ResponseTime = responseTimes.length > 0 ? 
-        calculatePercentile(responseTimes, 99) : 0;
-    const maxResponseTime = responseTimes.length > 0 ? 
-        Math.max(...responseTimes) : 0;
-    
-    // 创建性能监控图表
-    const performanceCtx = document.getElementById('performanceChart').getContext('2d');
-    performanceChart = new Chart(performanceCtx, {
-        type: 'radar',
-        data: {
-            labels: ['平均响应时间', 'P95响应时间', 'P99响应时间', '最大响应时间', '请求成功率'],
-            datasets: [{
-                label: '性能指标',
-                data: [
-                    Math.min(avgResponseTime / 10, 100), // 归一化到0-100
-                    Math.min(p95ResponseTime / 10, 100),
-                    Math.min(p99ResponseTime / 10, 100),
-                    Math.min(maxResponseTime / 10, 100),
-                    webhookData.length > 0 ? (successRates.reduce((a, b) => a + b, 0) / successRates.length) : 0
-                ],
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 2,
-                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        stepSize: 20
-                    }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: '性能监控雷达图'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const labels = ['平均响应时间', 'P95响应时间', 'P99响应时间', '最大响应时间', '请求成功率'];
-                            const values = [avgResponseTime, p95ResponseTime, p99ResponseTime, maxResponseTime, 
-                                          successRates.reduce((a, b) => a + b, 0) / successRates.length];
-                            const index = context.dataIndex;
-                            
-                            if (index < 4) {
-                                return `${labels[index]}: ${values[index].toFixed(2)} ms`;
-                            } else {
-                                return `${labels[index]}: ${values[index].toFixed(2)}%`;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    // 分析错误数据
-    const errorStats = {};
-    const errorsByHour = {};
-    
-    // 初始化每小时的错误统计
-    for (let i = 0; i < 24; i++) {
-        const hour = new Date(last24Hours);
-        hour.setHours(hour.getHours() + i);
-        const hourKey = hour.toISOString().slice(0, 13);
-        errorsByHour[hourKey] = 0;
+}
+
+// 导出Excel
+function exportExcel() {
+    if (logs.length === 0) {
+        showNotification('没有数据可导出', 'warning');
+        return;
     }
     
-    webhookData.forEach(log => {
-        // 判断是否为错误请求
-        let isError = false;
-        let errorType = 'Unknown';
-        
-        if (log.messageType === 'ERROR' || log.messageType === 'ALARM') {
-            isError = true;
-            errorType = log.messageType;
-        } else if (log.body && log.body.error) {
-            isError = true;
-            errorType = 'Application Error';
-        } else if (log.body && log.body.statusCode) {
-            const statusCode = log.body.statusCode;
-            if (statusCode >= 400 && statusCode < 500) {
-                isError = true;
-                errorType = '4xx Client Error';
-            } else if (statusCode >= 500) {
-                isError = true;
-                errorType = '5xx Server Error';
-            }
-        } else if (log.body && log.body.exception) {
-            isError = true;
-            errorType = 'Exception';
-        }
-        
-        if (isError) {
-            // 统计错误类型
-            errorStats[errorType] = (errorStats[errorType] || 0) + 1;
-            
-            // 统计每小时的错误数量
-            const logTime = new Date(log.timestamp);
-            if (logTime >= last24Hours) {
-                const hourKey = logTime.toISOString().slice(0, 13);
-                if (errorsByHour[hourKey] !== undefined) {
-                    errorsByHour[hourKey]++;
-                }
-            }
-        }
-    });
+    // 准备导出数据
+    const exportData = logs.map(log => ({
+        '时间': new Date(log.timestamp).toLocaleString(),
+        '状态码': log.statusCode || 'N/A',
+        '请求方法': log.method || 'POST',
+        'URL': log.url || 'N/A',
+        'Tenant ID': log.tenantId || '',
+        'Unique ID': log.uniqueId || '',
+        '响应时间(ms)': log.responseTime || '',
+        'IP地址': log.ip || '',
+        'User Agent': (log.headers && log.headers['user-agent']) || ''
+    }));
     
-    // 创建错误类型统计图表
-    const errorTypeCtx = document.getElementById('errorTypeChart').getContext('2d');
-    const errorTypes = Object.keys(errorStats);
-    const errorCounts = Object.values(errorStats);
+    // 创建工作簿
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Webhook日志');
     
-    if (errorTypes.length > 0) {
-        errorTypeChart = new Chart(errorTypeCtx, {
-            type: 'pie',
-            data: {
-                labels: errorTypes,
-                datasets: [{
-                    data: errorCounts,
-                    backgroundColor: [
-                        'rgba(231, 76, 60, 0.8)',
-                        'rgba(230, 126, 34, 0.8)',
-                        'rgba(241, 196, 15, 0.8)',
-                        'rgba(155, 89, 182, 0.8)',
-                        'rgba(52, 73, 94, 0.8)',
-                        'rgba(149, 165, 166, 0.8)'
-                    ],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: '错误类型分布'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((context.parsed / total) * 100).toFixed(1);
-                                return `${context.label}: ${context.parsed} (${percentage}%)`;
-                            }
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            boxWidth: 12,
-                            font: {
-                                size: 10
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    } else {
-        // 如果没有错误数据，显示空状态
-        errorTypeChart = new Chart(errorTypeCtx, {
-            type: 'pie',
-            data: {
-                labels: ['无错误'],
-                datasets: [{
-                    data: [1],
-                    backgroundColor: ['rgba(39, 174, 96, 0.8)'],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: '错误类型分布 - 无错误记录'
-                    },
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-    }
+    // 导出文件
+    const fileName = `webhook-logs-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
     
-    // 创建错误趋势图表
-    const errorTrendCtx = document.getElementById('errorTrendChart').getContext('2d');
-    const errorTrendLabels = Object.keys(errorsByHour).map(key => {
-        const date = new Date(key);
-        return `${date.getHours()}:00`;
-    });
-    const errorTrendData = Object.values(errorsByHour);
-    
-    errorTrendChart = new Chart(errorTrendCtx, {
-        type: 'line',
-        data: {
-            labels: errorTrendLabels,
-            datasets: [{
-                label: '错误数量',
-                data: errorTrendData,
-                backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                borderColor: 'rgba(231, 76, 60, 1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: '错误数量'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: '时间 (小时)'
-                    }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: '24小时错误趋势'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `错误数量: ${context.parsed.y}`;
-                        }
-                    }
-                }
-            }
-        }
-    });
+    showNotification('Excel文件已导出', 'success');
 }
 
-// 计算百分位数
-function calculatePercentile(arr, percentile) {
-    if (arr.length === 0) return 0;
-    
-    const sorted = [...arr].sort((a, b) => a - b);
-    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-    return sorted[Math.max(0, index)];
-}
-
-// 解析User-Agent字符串，提取浏览器/客户端信息
-function parseUserAgent(userAgent) {
-    if (!userAgent) return 'unknown';
-    
-    // 简化的User-Agent解析
-    if (userAgent.includes('Chrome')) {
-        return 'Chrome';
-    } else if (userAgent.includes('Firefox')) {
-        return 'Firefox';
-    } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
-        return 'Safari';
-    } else if (userAgent.includes('Edge')) {
-        return 'Edge';
-    } else if (userAgent.includes('curl')) {
-        return 'curl';
-    } else if (userAgent.includes('Postman')) {
-        return 'Postman';
-    } else if (userAgent.includes('Python')) {
-        return 'Python';
-    } else if (userAgent.includes('Node.js')) {
-        return 'Node.js';
-    } else if (userAgent.includes('Java')) {
-        return 'Java';
-    } else if (userAgent.includes('Go-http-client')) {
-        return 'Go';
-    } else if (userAgent.includes('bot') || userAgent.includes('Bot')) {
-        return 'Bot/Crawler';
-    } else {
-        // 截取前20个字符作为标识
-        return userAgent.substring(0, 20) + (userAgent.length > 20 ? '...' : '');
-    }
-}
-
-// 工具函数
-function closeModal(modal) {
-    modal.style.display = 'none';
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('zh-CN');
-}
-
-function formatDateTime(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleString('zh-CN');
-}
-
-function getBodyPreview(body) {
-    if (!body) return '(空)';
-    if (typeof body === 'object') {
-        const keys = Object.keys(body);
-        return keys.length > 0 ? `${keys.length}个字段` : '(空对象)';
-    }
-    const str = String(body);
-    return str.length > 50 ? str.substring(0, 50) + '...' : str;
-}
-
-function copyToClipboard(text) {
-    // 兼容性更好的复制方法
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(function() {
-            showNotification('已复制到剪贴板', 'success');
-        }).catch(function(err) {
-            console.error('复制失败:', err);
-            fallbackCopyTextToClipboard(text);
-        });
-    } else {
-        fallbackCopyTextToClipboard(text);
-    }
-}
-
-function fallbackCopyTextToClipboard(text) {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    textArea.style.top = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-        const successful = document.execCommand('copy');
-        if (successful) {
-            showNotification('已复制到剪贴板', 'success');
-        } else {
-            showNotification('复制失败，请手动复制', 'error');
-        }
-    } catch (err) {
-        console.error('复制失败:', err);
-        showNotification('复制失败，请手动复制', 'error');
-    }
-    
-    document.body.removeChild(textArea);
-}
-
-// 过滤日志（兼容旧代码）
-function filterLogs() {
-    loadLogsForWebhook();
-}
-
-function showNotification(message, type = 'info') {
-    // 创建通知元素
+// 显示通知
+function showNotification(message, type = 'info', duration = 3000) {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
     
-    // 添加样式
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 12px 20px;
-        border-radius: 6px;
-        color: white;
-        font-weight: 500;
-        z-index: 10000;
-        animation: slideIn 0.3s ease;
-    `;
-    
-    // 根据类型设置背景色
-    switch (type) {
-        case 'success':
-            notification.style.backgroundColor = '#27ae60';
-            break;
-        case 'error':
-            notification.style.backgroundColor = '#e74c3c';
-            break;
-        case 'warning':
-            notification.style.backgroundColor = '#f39c12';
-            break;
-        default:
-            notification.style.backgroundColor = '#3498db';
-    }
-    
-    // 添加动画样式
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
-    
     document.body.appendChild(notification);
     
-    // 3秒后自动移除
+    // 显示动画
     setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
+        notification.classList.add('show');
+    }, 100);
+    
+    // 自动隐藏
+    setTimeout(() => {
+        notification.classList.remove('show');
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
             }
         }, 300);
-    }, 3000);
+    }, duration);
 }
 
-// 主题切换相关函数
-function initTheme() {
-    // 从localStorage读取主题设置
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    // 如果有保存的主题设置，使用保存的；否则根据系统偏好设置
-    const isDark = savedTheme ? savedTheme === 'dark' : prefersDark;
-    
-    if (isDark) {
-        document.body.classList.add('dark-theme');
-        updateThemeButton(true);
-    } else {
-        document.body.classList.remove('dark-theme');
-        updateThemeButton(false);
-    }
-}
-
-function toggleTheme() {
-    const isDark = document.body.classList.contains('dark-theme');
-    
-    if (isDark) {
-        // 切换到亮色主题
-        document.body.classList.remove('dark-theme');
-        localStorage.setItem('theme', 'light');
-        updateThemeButton(false);
-        showNotification('已切换到亮色主题', 'success');
-    } else {
-        // 切换到暗色主题
-        document.body.classList.add('dark-theme');
-        localStorage.setItem('theme', 'dark');
-        updateThemeButton(true);
-        showNotification('已切换到暗色主题', 'success');
-    }
-}
-
-function updateThemeButton(isDark) {
-    const themeBtn = document.getElementById('themeToggleBtn');
-    if (isDark) {
-        themeBtn.textContent = '☀️ 亮色主题';
-        themeBtn.title = '切换到亮色主题';
-    } else {
-        themeBtn.textContent = '🌙 暗色主题';
-        themeBtn.title = '切换到暗色主题';
-    }
-}
-
-// 仪表板配置相关函数
-let dashboardConfig = {
-    charts: {
-        showSuccessRate: true,
-        showResponseTime: true,
-        showRequestTrend: true,
-        showIpSource: true,
-        showUserAgent: true,
-        showResponseTimeDist: true,
-        showPerformance: true,
-        showErrorType: true,
-        showErrorTrend: true,
-        showAlerts: true
-    },
-    layout: {
-        type: 'grid',
-        columns: 2
-    },
-    refresh: {
-        interval: 10000
-    }
-};
-
-let dashboardRefreshTimer = null;
-
-function initDashboardConfig() {
-    // 从localStorage读取配置
-    const savedConfig = localStorage.getItem('dashboardConfig');
-    if (savedConfig) {
-        try {
-            dashboardConfig = { ...dashboardConfig, ...JSON.parse(savedConfig) };
-        } catch (error) {
-            console.error('读取仪表板配置失败:', error);
-        }
-    }
-    
-    // 应用配置
-    applyDashboardConfig();
-}
-
-function openDashboardConfig() {
-    const modal = document.getElementById('dashboardConfigModal');
-    
-    // 加载当前配置到表单
-    loadConfigToForm();
-    
-    modal.style.display = 'block';
-}
-
-function closeDashboardConfig() {
-    const modal = document.getElementById('dashboardConfigModal');
-    modal.style.display = 'none';
-}
-
-function loadConfigToForm() {
-    // 加载图表显示配置
-    Object.keys(dashboardConfig.charts).forEach(key => {
-        const checkbox = document.getElementById(key);
-        if (checkbox) {
-            checkbox.checked = dashboardConfig.charts[key];
-        }
-    });
-    
-    // 加载布局配置
-    document.getElementById('dashboardLayout').value = dashboardConfig.layout.type;
-    document.getElementById('columnsCount').value = dashboardConfig.layout.columns;
-    
-    // 加载刷新配置
-    document.getElementById('refreshInterval').value = dashboardConfig.refresh.interval;
-}
-
-function saveDashboardConfig() {
-    // 保存图表显示配置
-    Object.keys(dashboardConfig.charts).forEach(key => {
-        const checkbox = document.getElementById(key);
-        if (checkbox) {
-            dashboardConfig.charts[key] = checkbox.checked;
-        }
-    });
-    
-    // 保存布局配置
-    dashboardConfig.layout.type = document.getElementById('dashboardLayout').value;
-    dashboardConfig.layout.columns = parseInt(document.getElementById('columnsCount').value);
-    
-    // 保存刷新配置
-    dashboardConfig.refresh.interval = parseInt(document.getElementById('refreshInterval').value);
-    
-    // 保存到localStorage
-    localStorage.setItem('dashboardConfig', JSON.stringify(dashboardConfig));
-    
-    // 应用配置
-    applyDashboardConfig();
-    
-    // 关闭模态框
-    closeDashboardConfig();
-    
-    showNotification('仪表板配置已保存', 'success');
-}
-
-function resetDashboardConfig() {
-    if (!confirm('确定要重置为默认配置吗？')) {
-        return;
-    }
-    
-    // 重置为默认配置
-    dashboardConfig = {
-        charts: {
-            showSuccessRate: true,
-            showResponseTime: true,
-            showRequestTrend: true,
-            showIpSource: true,
-            showUserAgent: true,
-            showResponseTimeDist: true,
-            showPerformance: true,
-            showErrorType: true,
-            showErrorTrend: true,
-            showAlerts: true
-        },
-        layout: {
-            type: 'grid',
-            columns: 2
-        },
-        refresh: {
-            interval: 10000
-        }
-    };
-    
-    // 更新表单
-    loadConfigToForm();
-    
-    showNotification('已重置为默认配置', 'info');
-}
-
-function applyDashboardConfig() {
-    // 应用图表显示配置
-    applyChartVisibility();
-    
-    // 应用布局配置
-    applyLayoutConfig();
-    
-    // 应用刷新配置
-    applyRefreshConfig();
-}
-
-function applyChartVisibility() {
-    const chartMappings = {
-        showSuccessRate: 'successRateChart',
-        showResponseTime: 'responseTimeChart',
-        showRequestTrend: 'requestTrendChart',
-        showIpSource: 'ipSourceChart',
-        showUserAgent: 'userAgentChart',
-        showResponseTimeDist: 'responseTimeDistChart',
-        showPerformance: 'performanceChart',
-        showErrorType: 'errorTypeChart',
-        showErrorTrend: 'errorTrendChart',
-        showAlerts: 'alertsContainer'
-    };
-    
-    Object.keys(chartMappings).forEach(configKey => {
-        const chartId = chartMappings[configKey];
-        const chartElement = document.getElementById(chartId);
-        
-        if (chartElement) {
-            const statsCard = chartElement.closest('.stats-card');
-            if (statsCard) {
-                if (dashboardConfig.charts[configKey]) {
-                    statsCard.style.display = 'block';
-                } else {
-                    statsCard.style.display = 'none';
+// 内存监控
+function startMemoryMonitoring() {
+    setInterval(() => {
+        if (performance.memory) {
+            const used = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+            const total = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024);
+            console.log(`内存使用: ${used}MB / ${total}MB`);
+            
+            // 如果内存使用超过100MB，清理旧日志
+            if (used > 100) {
+                if (logs.length > 500) {
+                    logs = logs.slice(0, 500);
+                    console.log('清理旧日志以释放内存');
+                }
+                if (allLogs.length > 500) {
+                    allLogs = allLogs.slice(0, 500);
                 }
             }
         }
-    });
+    }, 30000); // 每30秒检查一次
 }
-
-function applyLayoutConfig() {
-    const statsContent = document.querySelector('.stats-content');
-    if (!statsContent) return;
-    
-    // 清除所有布局类
-    statsContent.classList.remove('layout-grid', 'layout-list', 'layout-compact');
-    statsContent.classList.remove('columns-1', 'columns-2', 'columns-3', 'columns-4');
-    
-    // 应用布局类型
-    statsContent.classList.add(`layout-${dashboardConfig.layout.type}`);
-    
-    // 应用列数配置（仅对网格布局有效）
-    if (dashboardConfig.layout.type === 'grid') {
-        statsContent.classList.add(`columns-${dashboardConfig.layout.columns}`);
-    }
-}
-
-function applyRefreshConfig() {
-    // 清除现有定时器
-    if (dashboardRefreshTimer) {
-        clearInterval(dashboardRefreshTimer);
-        dashboardRefreshTimer = null;
-    }
-    
-    // 设置新的定时器
-    if (dashboardConfig.refresh.interval > 0) {
-        dashboardRefreshTimer = setInterval(() => {
-            // 只有在统计图表显示时才刷新
-            const statsSection = document.getElementById('statsSection');
-            if (statsSection && statsSection.style.display !== 'none') {
-                initCharts();
-                loadAlerts();
-            }
-        }, dashboardConfig.refresh.interval);
-    }
-}
-
-// 批量操作相关变量
-let batchMode = false;
-let selectedWebhooks = new Set();
-let sortableInstance = null;
 
 // 初始化拖拽排序
 function initSortable() {
-    const container = document.getElementById('webhookContainer');
-    if (container && typeof Sortable !== 'undefined') {
-        sortableInstance = Sortable.create(container, {
+    const webhookList = document.getElementById('webhookList');
+    if (webhookList && typeof Sortable !== 'undefined') {
+        new Sortable(webhookList, {
             animation: 150,
             ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            disabled: batchMode, // 批量模式下禁用拖拽
             onEnd: function(evt) {
-                // 获取新的排序
-                const newOrder = Array.from(container.children).map(item => item.dataset.webhookId);
-                // 保存新的排序到localStorage
-                localStorage.setItem('webhookOrder', JSON.stringify(newOrder));
-                // 重新渲染webhook列表以应用新排序
-                loadWebhooks();
+                // 这里可以添加保存排序的逻辑
+                console.log('Webhook排序已更改');
             }
         });
-    }
-}
-
-// 切换批量操作模式
-function toggleBatchMode() {
-    batchMode = !batchMode;
-    const container = document.getElementById('webhookContainer');
-    const batchActions = document.getElementById('batchActions');
-    const batchModeBtn = document.getElementById('batchModeBtn');
-    
-    if (batchMode) {
-        container.classList.add('batch-mode');
-        batchActions.style.display = 'flex';
-        batchModeBtn.textContent = '📋 退出批量';
-        batchModeBtn.classList.add('btn-warning');
-        batchModeBtn.classList.remove('btn-secondary');
-        
-        // 禁用拖拽排序
-        if (sortableInstance) {
-            sortableInstance.option('disabled', true);
-        }
-        
-        // 为每个webhook项添加点击事件
-        document.querySelectorAll('.webhook-item').forEach(item => {
-            item.addEventListener('click', handleWebhookSelection);
-        });
-    } else {
-        exitBatchMode();
-    }
-}
-
-// 退出批量操作模式
-function exitBatchMode() {
-    batchMode = false;
-    selectedWebhooks.clear();
-    const container = document.getElementById('webhookContainer');
-    const batchActions = document.getElementById('batchActions');
-    const batchModeBtn = document.getElementById('batchModeBtn');
-    
-    container.classList.remove('batch-mode');
-    batchActions.style.display = 'none';
-    batchModeBtn.textContent = '📋 批量操作';
-    batchModeBtn.classList.remove('btn-warning');
-    batchModeBtn.classList.add('btn-secondary');
-    
-    // 启用拖拽排序
-    if (sortableInstance) {
-        sortableInstance.option('disabled', false);
-    }
-    
-    // 移除选中状态
-    document.querySelectorAll('.webhook-item').forEach(item => {
-        item.classList.remove('selected');
-        item.removeEventListener('click', handleWebhookSelection);
-    });
-}
-
-// 处理webhook选择
-function handleWebhookSelection(event) {
-    if (!batchMode) return;
-    
-    event.stopPropagation();
-    const webhookItem = event.currentTarget;
-    const webhookId = webhookItem.dataset.webhookId;
-    
-    if (selectedWebhooks.has(webhookId)) {
-        selectedWebhooks.delete(webhookId);
-        webhookItem.classList.remove('selected');
-    } else {
-        selectedWebhooks.add(webhookId);
-        webhookItem.classList.add('selected');
-    }
-    
-    updateBatchActionButtons();
-}
-
-// 全选/取消全选
-function selectAllWebhooks() {
-    const webhookItems = document.querySelectorAll('.webhook-item');
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    
-    if (selectedWebhooks.size === webhookItems.length) {
-        // 取消全选
-        selectedWebhooks.clear();
-        webhookItems.forEach(item => item.classList.remove('selected'));
-        selectAllBtn.textContent = '全选';
-    } else {
-        // 全选
-        selectedWebhooks.clear();
-        webhookItems.forEach(item => {
-            const webhookId = item.dataset.webhookId;
-            selectedWebhooks.add(webhookId);
-            item.classList.add('selected');
-        });
-        selectAllBtn.textContent = '取消全选';
-    }
-    
-    updateBatchActionButtons();
-}
-
-// 更新批量操作按钮状态
-function updateBatchActionButtons() {
-    const hasSelection = selectedWebhooks.size > 0;
-    const webhookItems = document.querySelectorAll('.webhook-item');
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    
-    document.getElementById('batchEnableBtn').disabled = !hasSelection;
-    document.getElementById('batchDisableBtn').disabled = !hasSelection;
-    document.getElementById('batchDeleteBtn').disabled = !hasSelection;
-    
-    selectAllBtn.textContent = selectedWebhooks.size === webhookItems.length ? '取消全选' : '全选';
-}
-
-// 批量操作
-async function batchOperation(operation) {
-    if (selectedWebhooks.size === 0) {
-        showNotification('请先选择要操作的Webhook', 'warning');
-        return;
-    }
-    
-    const webhookIds = Array.from(selectedWebhooks);
-    let confirmMessage = '';
-    
-    switch (operation) {
-        case 'enable':
-            confirmMessage = `确定要启用选中的 ${webhookIds.length} 个Webhook吗？`;
-            break;
-        case 'disable':
-            confirmMessage = `确定要禁用选中的 ${webhookIds.length} 个Webhook吗？`;
-            break;
-        case 'delete':
-            confirmMessage = `确定要删除选中的 ${webhookIds.length} 个Webhook吗？此操作不可撤销！`;
-            break;
-    }
-    
-    if (!confirm(confirmMessage)) {
-        return;
-    }
-    
-    try {
-        const promises = webhookIds.map(async (webhookId) => {
-            const webhook = webhooks.find(w => w.id === webhookId);
-            if (!webhook) return;
-            
-            switch (operation) {
-                case 'enable':
-                    return fetch(`/api/webhooks/${webhookId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...webhook, enabled: true })
-                    });
-                case 'disable':
-                    return fetch(`/api/webhooks/${webhookId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...webhook, enabled: false })
-                    });
-                case 'delete':
-                    return fetch(`/api/webhooks/${webhookId}`, {
-                        method: 'DELETE'
-                    });
-            }
-        });
-        
-        await Promise.all(promises);
-        
-        // 刷新webhook列表
-        loadWebhooks();
-        
-        // 清空选择
-        selectedWebhooks.clear();
-        updateBatchActionButtons();
-        
-        const operationText = operation === 'enable' ? '启用' : operation === 'disable' ? '禁用' : '删除';
-        showNotification(`批量${operationText}操作完成！`, 'success');
-        
-    } catch (error) {
-        console.error('批量操作失败:', error);
-        showNotification('批量操作失败，请重试', 'error');
     }
 }
 
@@ -2875,23 +1465,11 @@ const shortcuts = {
     'ctrl+n': () => openWebhookModal(),
     'ctrl+s': () => toggleStats(),
     'ctrl+e': () => exportExcel(),
-    'ctrl+b': () => toggleBatchMode(),
-    'ctrl+a': (e) => {
-        if (batchMode) {
-            e.preventDefault();
-            selectAllWebhooks();
-        }
-    },
-    'ctrl+t': () => toggleTheme(),
     'escape': () => {
         // 关闭所有模态框
         document.querySelectorAll('.modal').forEach(modal => {
             modal.style.display = 'none';
         });
-        // 退出批量模式
-        if (batchMode) {
-            exitBatchMode();
-        }
     },
     'ctrl+f': (e) => {
         e.preventDefault();
@@ -2902,11 +1480,12 @@ const shortcuts = {
     'f5': (e) => {
         e.preventDefault();
         loadWebhooks();
+        loadLogs();
         showNotification('数据已刷新', 'success');
     }
 };
 
-// 绑定快捷键事件
+// 绑定快捷键
 function bindShortcuts() {
     document.addEventListener('keydown', (e) => {
         const key = [];
@@ -2916,7 +1495,6 @@ function bindShortcuts() {
         key.push(e.key.toLowerCase());
         
         const shortcut = key.join('+');
-        
         if (shortcuts[shortcut]) {
             shortcuts[shortcut](e);
         }
@@ -2942,18 +1520,6 @@ function showShortcutHelp() {
                     <span>导出Excel</span>
                 </div>
                 <div class="shortcut-item">
-                    <kbd>Ctrl + B</kbd>
-                    <span>切换批量操作模式</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Ctrl + A</kbd>
-                    <span>全选（批量模式下）</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Ctrl + T</kbd>
-                    <span>切换主题</span>
-                </div>
-                <div class="shortcut-item">
                     <kbd>Ctrl + F</kbd>
                     <span>聚焦搜索框</span>
                 </div>
@@ -2963,7 +1529,7 @@ function showShortcutHelp() {
                 </div>
                 <div class="shortcut-item">
                     <kbd>Esc</kbd>
-                    <span>关闭模态框/退出批量模式</span>
+                    <span>关闭模态框</span>
                 </div>
             </div>
         </div>
@@ -2992,18 +1558,6 @@ const tourSteps = [
         title: '统计图表',
         content: '查看详细的统计数据和图表分析',
         position: 'bottom'
-    },
-    {
-        element: '#batchModeBtn',
-        title: '批量操作',
-        content: '启用批量操作模式，可以同时管理多个Webhook',
-        position: 'bottom'
-    },
-    {
-        element: '#themeToggle',
-        title: '主题切换',
-        content: '切换暗色/亮色主题',
-        position: 'bottom'
     }
 ];
 
@@ -3017,9 +1571,10 @@ function startTour() {
     showTourStep();
 }
 
+// 显示引导步骤
 function showTourStep() {
     if (tourStep >= tourSteps.length) {
-        endTour();
+        localStorage.setItem('tourCompleted', 'true');
         return;
     }
     
@@ -3032,3427 +1587,182 @@ function showTourStep() {
         return;
     }
     
-    // 创建引导提示框
-    const tooltip = document.createElement('div');
-    tooltip.className = 'tour-tooltip';
-    tooltip.innerHTML = `
+    const tour = document.createElement('div');
+    tour.className = 'tour-tooltip';
+    tour.innerHTML = `
         <div class="tour-content">
             <h4>${step.title}</h4>
             <p>${step.content}</p>
             <div class="tour-actions">
-                <button class="btn btn-small btn-secondary" onclick="skipTour()">跳过引导</button>
-                <button class="btn btn-small btn-primary" onclick="nextTourStep()">下一步 (${tourStep + 1}/${tourSteps.length})</button>
+                <button class="ant-btn ant-btn-sm" onclick="skipTour()">跳过</button>
+                <button class="ant-btn ant-btn-primary ant-btn-sm" onclick="nextTourStep()">
+                    ${tourStep === tourSteps.length - 1 ? '完成' : '下一步'}
+                </button>
             </div>
         </div>
-        <div class="tour-arrow"></div>
     `;
     
-    // 定位提示框
+    document.body.appendChild(tour);
+    
+    // 定位tooltip
     const rect = element.getBoundingClientRect();
-    tooltip.style.position = 'fixed';
-    tooltip.style.zIndex = '10000';
+    tour.style.position = 'fixed';
+    tour.style.left = rect.left + 'px';
+    tour.style.top = (rect.bottom + 10) + 'px';
+    tour.style.zIndex = '9999';
     
-    switch (step.position) {
-        case 'bottom':
-            tooltip.style.top = (rect.bottom + 10) + 'px';
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
-            break;
-        case 'top':
-            tooltip.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
-            break;
-        case 'left':
-            tooltip.style.top = (rect.top + rect.height / 2) + 'px';
-            tooltip.style.right = (window.innerWidth - rect.left + 10) + 'px';
-            tooltip.style.transform = 'translateY(-50%)';
-            break;
-        case 'right':
-            tooltip.style.top = (rect.top + rect.height / 2) + 'px';
-            tooltip.style.left = (rect.right + 10) + 'px';
-            tooltip.style.transform = 'translateY(-50%)';
-            break;
-    }
-    
-    // 高亮目标元素
+    // 高亮元素
     element.classList.add('tour-highlight');
-    
-    document.body.appendChild(tooltip);
-    
-    // 添加遮罩层
-    const overlay = document.createElement('div');
-    overlay.className = 'tour-overlay';
-    overlay.onclick = nextTourStep;
-    document.body.appendChild(overlay);
 }
 
+// 下一步引导
 function nextTourStep() {
-    // 清理当前步骤
-    const tooltip = document.querySelector('.tour-tooltip');
-    const overlay = document.querySelector('.tour-overlay');
-    const highlighted = document.querySelector('.tour-highlight');
+    // 移除当前高亮
+    document.querySelectorAll('.tour-highlight').forEach(el => {
+        el.classList.remove('tour-highlight');
+    });
     
-    if (tooltip) tooltip.remove();
-    if (overlay) overlay.remove();
-    if (highlighted) highlighted.classList.remove('tour-highlight');
+    // 移除tooltip
+    document.querySelectorAll('.tour-tooltip').forEach(el => {
+        el.remove();
+    });
     
     tourStep++;
-    setTimeout(showTourStep, 300);
+    showTourStep();
 }
 
+// 跳过引导
 function skipTour() {
-    endTour();
-}
-
-function endTour() {
-    // 清理所有引导元素
-    const tooltip = document.querySelector('.tour-tooltip');
-    const overlay = document.querySelector('.tour-overlay');
-    const highlighted = document.querySelector('.tour-highlight');
-    
-    if (tooltip) tooltip.remove();
-    if (overlay) overlay.remove();
-    if (highlighted) highlighted.classList.remove('tour-highlight');
-    
-    localStorage.setItem('tourCompleted', 'true');
-    showNotification('引导完成！按 ? 键可随时查看快捷键帮助', 'success');
-}
-
-// 性能优化相关
-let performanceMetrics = {
-    renderTime: 0,
-    memoryUsage: 0,
-    requestCount: 0
-};
-
-// 虚拟滚动实现（用于大量日志数据）
-class VirtualScroll {
-    constructor(container, itemHeight, renderItem) {
-        this.container = container;
-        this.itemHeight = itemHeight;
-        this.renderItem = renderItem;
-        this.data = [];
-        this.visibleStart = 0;
-        this.visibleEnd = 0;
-        this.scrollTop = 0;
-        
-        this.init();
-    }
-    
-    init() {
-        this.container.style.position = 'relative';
-        this.container.addEventListener('scroll', this.onScroll.bind(this));
-        
-        // 创建虚拟容器
-        this.virtualContainer = document.createElement('div');
-        this.virtualContainer.style.position = 'absolute';
-        this.virtualContainer.style.top = '0';
-        this.virtualContainer.style.left = '0';
-        this.virtualContainer.style.right = '0';
-        this.container.appendChild(this.virtualContainer);
-        
-        // 创建占位容器
-        this.spacer = document.createElement('div');
-        this.container.appendChild(this.spacer);
-    }
-    
-    setData(data) {
-        this.data = data;
-        this.spacer.style.height = (data.length * this.itemHeight) + 'px';
-        this.render();
-    }
-    
-    onScroll() {
-        this.scrollTop = this.container.scrollTop;
-        this.render();
-    }
-    
-    render() {
-        const containerHeight = this.container.clientHeight;
-        const startIndex = Math.floor(this.scrollTop / this.itemHeight);
-        const endIndex = Math.min(
-            startIndex + Math.ceil(containerHeight / this.itemHeight) + 1,
-            this.data.length
-        );
-        
-        this.visibleStart = startIndex;
-        this.visibleEnd = endIndex;
-        
-        // 清空虚拟容器
-        this.virtualContainer.innerHTML = '';
-        this.virtualContainer.style.transform = `translateY(${startIndex * this.itemHeight}px)`;
-        
-        // 渲染可见项
-        for (let i = startIndex; i < endIndex; i++) {
-            if (this.data[i]) {
-                const item = this.renderItem(this.data[i], i);
-                this.virtualContainer.appendChild(item);
-            }
-        }
-    }
-}
-
-// 分页管理器
-class PaginationManager {
-    constructor(container, itemsPerPage = 50) {
-        this.container = container;
-        this.itemsPerPage = itemsPerPage;
-        this.currentPage = 1;
-        this.totalPages = 1;
-        this.data = [];
-        this.filteredData = [];
-        this.renderItem = null;
-        
-        this.createPaginationControls();
-    }
-    
-    createPaginationControls() {
-        this.paginationContainer = document.createElement('div');
-        this.paginationContainer.className = 'pagination-controls';
-        this.paginationContainer.innerHTML = `
-            <div class="pagination-info">
-                <span id="paginationInfo">显示 0-0 条，共 0 条</span>
-            </div>
-            <div class="pagination-buttons">
-                <button id="firstPageBtn" class="btn btn-small btn-secondary">首页</button>
-                <button id="prevPageBtn" class="btn btn-small btn-secondary">上一页</button>
-                <span id="pageNumbers" class="page-numbers"></span>
-                <button id="nextPageBtn" class="btn btn-small btn-secondary">下一页</button>
-                <button id="lastPageBtn" class="btn btn-small btn-secondary">末页</button>
-            </div>
-            <div class="pagination-size">
-                <select id="pageSizeSelect" class="form-control">
-                    <option value="25">25条/页</option>
-                    <option value="50" selected>50条/页</option>
-                    <option value="100">100条/页</option>
-                    <option value="200">200条/页</option>
-                </select>
-            </div>
-        `;
-        
-        this.container.parentNode.insertBefore(this.paginationContainer, this.container.nextSibling);
-        this.bindPaginationEvents();
-    }
-    
-    bindPaginationEvents() {
-        document.getElementById('firstPageBtn').addEventListener('click', () => this.goToPage(1));
-        document.getElementById('prevPageBtn').addEventListener('click', () => this.goToPage(this.currentPage - 1));
-        document.getElementById('nextPageBtn').addEventListener('click', () => this.goToPage(this.currentPage + 1));
-        document.getElementById('lastPageBtn').addEventListener('click', () => this.goToPage(this.totalPages));
-        document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
-            this.itemsPerPage = parseInt(e.target.value);
-            this.currentPage = 1;
-            this.render();
-        });
-    }
-    
-    setData(data, renderItem) {
-        this.data = data;
-        this.filteredData = data;
-        this.renderItem = renderItem;
-        this.currentPage = 1;
-        this.render();
-    }
-    
-    setFilteredData(filteredData) {
-        this.filteredData = filteredData;
-        this.currentPage = 1;
-        this.render();
-    }
-    
-    goToPage(page) {
-        if (page < 1 || page > this.totalPages) return;
-        this.currentPage = page;
-        this.render();
-    }
-    
-    render() {
-        this.totalPages = Math.ceil(this.filteredData.length / this.itemsPerPage);
-        if (this.totalPages === 0) this.totalPages = 1;
-        
-        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-        const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredData.length);
-        const pageData = this.filteredData.slice(startIndex, endIndex);
-        
-        // 渲染数据
-        this.container.innerHTML = '';
-        if (pageData.length === 0) {
-            this.container.innerHTML = '<div class="no-logs">暂无数据</div>';
-        } else {
-            pageData.forEach((item, index) => {
-                const element = this.renderItem(item, startIndex + index);
-                this.container.appendChild(element);
-            });
-        }
-        
-        // 更新分页控件
-        this.updatePaginationControls();
-    }
-    
-    updatePaginationControls() {
-        const startIndex = (this.currentPage - 1) * this.itemsPerPage + 1;
-        const endIndex = Math.min(this.currentPage * this.itemsPerPage, this.filteredData.length);
-        
-        document.getElementById('paginationInfo').textContent = 
-            `显示 ${startIndex}-${endIndex} 条，共 ${this.filteredData.length} 条`;
-        
-        document.getElementById('firstPageBtn').disabled = this.currentPage === 1;
-        document.getElementById('prevPageBtn').disabled = this.currentPage === 1;
-        document.getElementById('nextPageBtn').disabled = this.currentPage === this.totalPages;
-        document.getElementById('lastPageBtn').disabled = this.currentPage === this.totalPages;
-        
-        // 生成页码按钮
-        this.generatePageNumbers();
-    }
-    
-    generatePageNumbers() {
-        const pageNumbers = document.getElementById('pageNumbers');
-        pageNumbers.innerHTML = '';
-        
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
-        
-        if (endPage - startPage + 1 < maxVisiblePages) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-            const pageBtn = document.createElement('button');
-            pageBtn.className = `btn btn-small ${i === this.currentPage ? 'btn-primary' : 'btn-secondary'}`;
-            pageBtn.textContent = i;
-            pageBtn.addEventListener('click', () => this.goToPage(i));
-            pageNumbers.appendChild(pageBtn);
-        }
-    }
-}
-
-// 视图切换管理器
-class ViewManager {
-    constructor() {
-        this.currentView = localStorage.getItem('logView') || 'list';
-        this.createViewControls();
-    }
-    
-    createViewControls() {
-        const logsHeader = document.querySelector('.logs-header');
-        const viewControls = document.createElement('div');
-        viewControls.className = 'view-controls';
-        viewControls.innerHTML = `
-            <div class="view-toggle">
-                <button id="listViewBtn" class="btn btn-small ${this.currentView === 'list' ? 'btn-primary' : 'btn-secondary'}">
-                    📋 列表视图
-                </button>
-                <button id="cardViewBtn" class="btn btn-small ${this.currentView === 'card' ? 'btn-primary' : 'btn-secondary'}">
-                    🗃️ 卡片视图
-                </button>
-                <button id="compactViewBtn" class="btn btn-small ${this.currentView === 'compact' ? 'btn-primary' : 'btn-secondary'}">
-                    📄 紧凑视图
-                </button>
-            </div>
-        `;
-        
-        logsHeader.appendChild(viewControls);
-        this.bindViewEvents();
-        this.applyView();
-    }
-    
-    bindViewEvents() {
-        document.getElementById('listViewBtn').addEventListener('click', () => this.switchView('list'));
-        document.getElementById('cardViewBtn').addEventListener('click', () => this.switchView('card'));
-        document.getElementById('compactViewBtn').addEventListener('click', () => this.switchView('compact'));
-    }
-    
-    switchView(view) {
-        this.currentView = view;
-        localStorage.setItem('logView', view);
-        
-        // 更新按钮状态
-        document.querySelectorAll('.view-toggle .btn').forEach(btn => {
-            btn.classList.remove('btn-primary');
-            btn.classList.add('btn-secondary');
-        });
-        
-        document.getElementById(`${view}ViewBtn`).classList.remove('btn-secondary');
-        document.getElementById(`${view}ViewBtn`).classList.add('btn-primary');
-        
-        this.applyView();
-        
-        // 重新渲染日志
-        if (typeof loadLogs === 'function') {
-            loadLogs();
-        }
-    }
-    
-    applyView() {
-        const logsContainer = document.getElementById('logsContainer');
-        logsContainer.className = `logs-container view-${this.currentView}`;
-    }
-    
-    getCurrentView() {
-        return this.currentView;
-    }
-}
-
-// JSON格式化器
-class JSONFormatter {
-    static format(obj, collapsed = false) {
-        if (typeof obj === 'string') {
-            try {
-                obj = JSON.parse(obj);
-            } catch (e) {
-                return obj;
-            }
-        }
-        
-        return this.createJsonElement(obj, 0, collapsed);
-    }
-    
-    static createJsonElement(obj, depth = 0, collapsed = false) {
-        const container = document.createElement('div');
-        container.className = 'json-formatter';
-        
-        if (obj === null) {
-            container.innerHTML = '<span class="json-null">null</span>';
-            return container;
-        }
-        
-        if (typeof obj === 'boolean') {
-            container.innerHTML = `<span class="json-boolean">${obj}</span>`;
-            return container;
-        }
-        
-        if (typeof obj === 'number') {
-            container.innerHTML = `<span class="json-number">${obj}</span>`;
-            return container;
-        }
-        
-        if (typeof obj === 'string') {
-            container.innerHTML = `<span class="json-string">"${this.escapeHtml(obj)}"</span>`;
-            return container;
-        }
-        
-        if (Array.isArray(obj)) {
-            return this.createArrayElement(obj, depth, collapsed);
-        }
-        
-        if (typeof obj === 'object') {
-            return this.createObjectElement(obj, depth, collapsed);
-        }
-        
-        return container;
-    }
-    
-    static createArrayElement(arr, depth, collapsed) {
-        const container = document.createElement('div');
-        container.className = 'json-array';
-        
-        const toggle = document.createElement('span');
-        toggle.className = 'json-toggle';
-        toggle.textContent = collapsed ? '▶' : '▼';
-        toggle.addEventListener('click', () => this.toggleCollapse(container));
-        
-        const bracket = document.createElement('span');
-        bracket.className = 'json-bracket';
-        bracket.textContent = `[${arr.length}]`;
-        
-        const header = document.createElement('div');
-        header.className = 'json-header';
-        header.appendChild(toggle);
-        header.appendChild(bracket);
-        
-        const content = document.createElement('div');
-        content.className = 'json-content';
-        content.style.display = collapsed ? 'none' : 'block';
-        
-        arr.forEach((item, index) => {
-            const itemElement = document.createElement('div');
-            itemElement.className = 'json-item';
-            itemElement.style.marginLeft = `${(depth + 1) * 20}px`;
-            
-            const indexSpan = document.createElement('span');
-            indexSpan.className = 'json-index';
-            indexSpan.textContent = `${index}: `;
-            
-            itemElement.appendChild(indexSpan);
-            itemElement.appendChild(this.createJsonElement(item, depth + 1, false));
-            
-            if (index < arr.length - 1) {
-                itemElement.appendChild(document.createTextNode(','));
-            }
-            
-            content.appendChild(itemElement);
-        });
-        
-        container.appendChild(header);
-        container.appendChild(content);
-        
-        return container;
-    }
-    
-    static createObjectElement(obj, depth, collapsed) {
-        const container = document.createElement('div');
-        container.className = 'json-object';
-        
-        const keys = Object.keys(obj);
-        
-        const toggle = document.createElement('span');
-        toggle.className = 'json-toggle';
-        toggle.textContent = collapsed ? '▶' : '▼';
-        toggle.addEventListener('click', () => this.toggleCollapse(container));
-        
-        const bracket = document.createElement('span');
-        bracket.className = 'json-bracket';
-        bracket.textContent = `{${keys.length}}`;
-        
-        const header = document.createElement('div');
-        header.className = 'json-header';
-        header.appendChild(toggle);
-        header.appendChild(bracket);
-        
-        const content = document.createElement('div');
-        content.className = 'json-content';
-        content.style.display = collapsed ? 'none' : 'block';
-        
-        keys.forEach((key, index) => {
-            const itemElement = document.createElement('div');
-            itemElement.className = 'json-item';
-            itemElement.style.marginLeft = `${(depth + 1) * 20}px`;
-            
-            const keySpan = document.createElement('span');
-            keySpan.className = 'json-key';
-            keySpan.textContent = `"${key}": `;
-            
-            itemElement.appendChild(keySpan);
-            itemElement.appendChild(this.createJsonElement(obj[key], depth + 1, false));
-            
-            if (index < keys.length - 1) {
-                itemElement.appendChild(document.createTextNode(','));
-            }
-            
-            content.appendChild(itemElement);
-        });
-        
-        container.appendChild(header);
-        container.appendChild(content);
-        
-        return container;
-    }
-    
-    static toggleCollapse(container) {
-        const toggle = container.querySelector('.json-toggle');
-        const content = container.querySelector('.json-content');
-        
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
-    }
-    
-    static escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-}
-
-// 全局变量
-let paginationManager = null;
-let viewManager = null;
-
-// 修改原有的bindEvents函数，添加批量操作事件绑定
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 页面加载完成，开始初始化...');
-    testServerConnection();
-    initializeSocket();
-    loadWebhooks();
-    bindEvents();
-    startMemoryMonitoring();
-    initTheme();
-    
-    // 初始化拖拽排序
-    setTimeout(() => {
-        initSortable();
-    }, 1000);
-    
-    // 绑定批量操作事件
-    document.getElementById('batchModeBtn').addEventListener('click', toggleBatchMode);
-    document.getElementById('selectAllBtn').addEventListener('click', selectAllWebhooks);
-    document.getElementById('batchEnableBtn').addEventListener('click', () => batchOperation('enable'));
-    document.getElementById('batchDisableBtn').addEventListener('click', () => batchOperation('disable'));
-    document.getElementById('batchDeleteBtn').addEventListener('click', () => batchOperation('delete'));
-    document.getElementById('exitBatchBtn').addEventListener('click', exitBatchMode);
-    
-    // 绑定快捷键
-    bindShortcuts();
-    
-    // 绑定帮助快捷键
-    document.addEventListener('keydown', (e) => {
-        if (e.key === '?' && !e.ctrlKey && !e.altKey) {
-            e.preventDefault();
-            showShortcutHelp();
-        }
+    document.querySelectorAll('.tour-highlight').forEach(el => {
+        el.classList.remove('tour-highlight');
     });
-    
-    // 启动操作引导
-    setTimeout(startTour, 2000);
-});
-
-// ==================== 高级搜索功能 ====================
-
-// 打开高级搜索模态框
-function openAdvancedSearchModal() {
-    document.getElementById('advancedSearchModal').style.display = 'block';
-    loadSearchHistory();
-    initializeAdvancedSearch();
+    document.querySelectorAll('.tour-tooltip').forEach(el => {
+        el.remove();
+    });
+    localStorage.setItem('tourCompleted', 'true');
 }
 
-// 关闭高级搜索模态框
-function closeAdvancedSearchModal() {
-    document.getElementById('advancedSearchModal').style.display = 'none';
-    resetAdvancedSearch();
+// 告警检查
+function checkAlerts(log) {
+    // 检查响应时间告警
+    if (log.responseTime && log.responseTime > 5000) {
+        addAlert({
+            type: 'warning',
+            message: `响应时间过长: ${log.responseTime}ms`,
+            timestamp: new Date().toISOString(),
+            log: log
+        });
+    }
+    
+    // 检查错误状态码告警
+    if (log.statusCode >= 500) {
+        addAlert({
+            type: 'error',
+            message: `服务器错误: ${log.statusCode}`,
+            timestamp: new Date().toISOString(),
+            log: log
+        });
+    }
+    
+    // 检查频率告警
+    const recentLogs = logs.filter(l => 
+        new Date(l.timestamp) > new Date(Date.now() - 60000) // 最近1分钟
+    );
+    
+    if (recentLogs.length > 100) {
+        addAlert({
+            type: 'warning',
+            message: `请求频率过高: ${recentLogs.length}/分钟`,
+            timestamp: new Date().toISOString()
+        });
+    }
 }
 
-// 初始化高级搜索
-function initializeAdvancedSearch() {
-    // 重置搜索条件
-    advancedSearchConditions = [];
+// 添加告警
+function addAlert(alert) {
+    alerts.unshift(alert);
     
-    // 添加第一个搜索条件
-    addSearchCondition();
+    // 限制告警数量
+    if (alerts.length > 50) {
+        alerts = alerts.slice(0, 50);
+    }
     
-    // 重置表单
-    document.getElementById('searchField').value = 'all';
-    document.getElementById('searchValue').value = '';
-    document.getElementById('searchOperator').value = 'contains';
-    document.getElementById('caseSensitive').checked = false;
-    document.getElementById('enableRegexSearch').checked = false;
-    document.getElementById('conditionLogic').value = 'AND';
+    // 显示通知
+    showNotification(alert.message, alert.type);
     
-    // 隐藏正则表达式帮助
-    document.getElementById('regexHelp').style.display = 'none';
+    // 更新告警显示
+    updateAlertsDisplay();
 }
 
-// 添加搜索条件
-function addSearchCondition() {
-    const conditionId = Date.now() + Math.random();
-    const condition = {
-        id: conditionId,
-        field: 'all',
-        value: '',
-        operator: 'contains',
-        caseSensitive: false
-    };
+// 更新告警显示
+function updateAlertsDisplay() {
+    const container = document.getElementById('alertsList');
+    if (!container) return;
     
-    advancedSearchConditions.push(condition);
-    renderSearchConditions();
-}
-
-// 渲染搜索条件
-function renderSearchConditions() {
-    const container = document.getElementById('searchConditions');
     container.innerHTML = '';
     
-    advancedSearchConditions.forEach((condition, index) => {
-        const conditionElement = createSearchConditionElement(condition, index);
-        container.appendChild(conditionElement);
-    });
-}
-
-// 创建搜索条件元素
-function createSearchConditionElement(condition, index) {
-    const div = document.createElement('div');
-    div.className = 'search-condition';
-    div.innerHTML = `
-        <div class="search-condition-header">
-            <span class="search-condition-title">条件 ${index + 1}</span>
-            <button class="remove-condition" onclick="removeSearchCondition(${condition.id})" title="删除条件">×</button>
-        </div>
-        <div class="search-condition-fields">
-            <div class="form-group">
-                <label>字段：</label>
-                <select onchange="updateSearchCondition(${condition.id}, 'field', this.value)">
-                    <option value="all" ${condition.field === 'all' ? 'selected' : ''}>所有字段</option>
-                    <option value="tenantId" ${condition.field === 'tenantId' ? 'selected' : ''}>Tenant ID</option>
-                    <option value="uniqueId" ${condition.field === 'uniqueId' ? 'selected' : ''}>Unique ID</option>
-                    <option value="url" ${condition.field === 'url' ? 'selected' : ''}>请求URL</option>
-                    <option value="method" ${condition.field === 'method' ? 'selected' : ''}>请求方法</option>
-                    <option value="status" ${condition.field === 'status' ? 'selected' : ''}>响应状态</option>
-                    <option value="ip" ${condition.field === 'ip' ? 'selected' : ''}>客户端IP</option>
-                    <option value="userAgent" ${condition.field === 'userAgent' ? 'selected' : ''}>User-Agent</option>
-                    <option value="body" ${condition.field === 'body' ? 'selected' : ''}>请求体内容</option>
-                    <option value="headers" ${condition.field === 'headers' ? 'selected' : ''}>请求头</option>
-                </select>
+    alerts.forEach(alert => {
+        const div = document.createElement('div');
+        div.className = `alert alert-${alert.type}`;
+        div.innerHTML = `
+            <div class="alert-content">
+                <div class="alert-message">${alert.message}</div>
+                <div class="alert-time">${new Date(alert.timestamp).toLocaleString()}</div>
             </div>
-            <div class="form-group">
-                <label>操作符：</label>
-                <select onchange="updateSearchCondition(${condition.id}, 'operator', this.value)">
-                    <option value="contains" ${condition.operator === 'contains' ? 'selected' : ''}>包含</option>
-                    <option value="equals" ${condition.operator === 'equals' ? 'selected' : ''}>等于</option>
-                    <option value="startsWith" ${condition.operator === 'startsWith' ? 'selected' : ''}>开头是</option>
-                    <option value="endsWith" ${condition.operator === 'endsWith' ? 'selected' : ''}>结尾是</option>
-                    <option value="regex" ${condition.operator === 'regex' ? 'selected' : ''}>正则匹配</option>
-                </select>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>搜索值：</label>
-            <input type="text" value="${condition.value}" 
-                   onchange="updateSearchCondition(${condition.id}, 'value', this.value)"
-                   placeholder="输入搜索关键词或正则表达式">
-        </div>
-        <div class="form-group">
-            <label>
-                <input type="checkbox" ${condition.caseSensitive ? 'checked' : ''}
-                       onchange="updateSearchCondition(${condition.id}, 'caseSensitive', this.checked)">
-                区分大小写
-            </label>
-        </div>
-    `;
-    
-    return div;
-}
-
-// 更新搜索条件
-function updateSearchCondition(conditionId, field, value) {
-    const condition = advancedSearchConditions.find(c => c.id === conditionId);
-    if (condition) {
-        condition[field] = value;
-    }
-}
-
-// 删除搜索条件
-function removeSearchCondition(conditionId) {
-    advancedSearchConditions = advancedSearchConditions.filter(c => c.id !== conditionId);
-    renderSearchConditions();
-}
-
-// 切换正则表达式帮助
-function toggleRegexHelp() {
-    const enableRegex = document.getElementById('enableRegexSearch').checked;
-    const regexHelp = document.getElementById('regexHelp');
-    regexHelp.style.display = enableRegex ? 'block' : 'none';
-}
-
-// 更新搜索操作符
-function updateSearchOperator() {
-    const operator = document.getElementById('searchOperator').value;
-    const regexHelp = document.getElementById('regexHelp');
-    regexHelp.style.display = operator === 'regex' ? 'block' : 'none';
-}
-
-// 应用高级搜索
-function applyAdvancedSearch() {
-    if (advancedSearchConditions.length === 0) {
-        showNotification('请至少添加一个搜索条件', 'warning');
-        return;
-    }
-    
-    // 验证搜索条件
-    for (const condition of advancedSearchConditions) {
-        if (!condition.value.trim()) {
-            showNotification(`条件 ${advancedSearchConditions.indexOf(condition) + 1} 的搜索值不能为空`, 'warning');
-            return;
-        }
-    }
-    
-    // 保存当前搜索
-    const searchName = `高级搜索_${new Date().toLocaleString()}`;
-    const searchConfig = {
-        name: searchName,
-        conditions: [...advancedSearchConditions],
-        logic: document.getElementById('conditionLogic').value,
-        timestamp: Date.now()
-    };
-    
-    // 添加到搜索历史
-    searchHistory.unshift(searchConfig);
-    if (searchHistory.length > 20) {
-        searchHistory.pop(); // 最多保存20条搜索历史
-    }
-    
-    // 保存到本地存储
-    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
-    
-    // 应用搜索
-    currentAdvancedSearch = searchConfig;
-    applyAdvancedSearchToLogs();
-    
-    // 关闭模态框
-    closeAdvancedSearchModal();
-    
-    showNotification('高级搜索已应用', 'success');
-}
-
-// 应用高级搜索到日志
-function applyAdvancedSearchToLogs() {
-    if (!currentAdvancedSearch) return;
-    
-    const { conditions, logic } = currentAdvancedSearch;
-    
-    logs = allLogs.filter(log => {
-        if (logic === 'AND') {
-            // 所有条件都必须满足
-            return conditions.every(condition => evaluateSearchCondition(log, condition));
-        } else {
-            // 任一条件满足即可
-            return conditions.some(condition => evaluateSearchCondition(log, condition));
-        }
-    });
-    
-    renderLogs();
-    updateSearchResultInfo();
-    
-    // 显示清除高级搜索按钮
-    document.getElementById('clearAdvancedSearchBtn').style.display = 'inline-block';
-}
-
-// 评估搜索条件
-function evaluateSearchCondition(log, condition) {
-    const { field, value, operator, caseSensitive } = condition;
-    const searchValue = value.trim();
-    
-    if (!searchValue) return true;
-    
-    let fieldValue = '';
-    
-    // 根据字段获取值
-    if (field === 'all') {
-        // 搜索所有字段
-        fieldValue = JSON.stringify(log).toLowerCase();
-    } else if (field === 'tenantId') {
-        fieldValue = extractFieldFromLog(log, 'tenantId') || '';
-    } else if (field === 'uniqueId') {
-        fieldValue = extractFieldFromLog(log, 'uniqueId') || '';
-    } else if (field === 'url') {
-        fieldValue = log.url || '';
-    } else if (field === 'method') {
-        fieldValue = log.method || '';
-    } else if (field === 'status') {
-        fieldValue = log.status || '';
-    } else if (field === 'ip') {
-        fieldValue = log.ip || '';
-    } else if (field === 'userAgent') {
-        fieldValue = log.userAgent || '';
-    } else if (field === 'body') {
-        fieldValue = JSON.stringify(log.body || {});
-    } else if (field === 'headers') {
-        fieldValue = JSON.stringify(log.headers || {});
-    }
-    
-    // 转换为字符串
-    fieldValue = String(fieldValue);
-    
-    // 根据操作符进行匹配
-    if (operator === 'regex') {
-        try {
-            const flags = caseSensitive ? 'g' : 'gi';
-            const regex = new RegExp(searchValue, flags);
-            return regex.test(fieldValue);
-        } catch (error) {
-            console.error('正则表达式错误:', error);
-            return false;
-        }
-    } else {
-        // 非正则表达式搜索
-        if (!caseSensitive) {
-            fieldValue = fieldValue.toLowerCase();
-            searchValue = searchValue.toLowerCase();
-        }
-        
-        switch (operator) {
-            case 'contains':
-                return fieldValue.includes(searchValue);
-            case 'equals':
-                return fieldValue === searchValue;
-            case 'startsWith':
-                return fieldValue.startsWith(searchValue);
-            case 'endsWith':
-                return fieldValue.endsWith(searchValue);
-            default:
-                return fieldValue.includes(searchValue);
-        }
-    }
-}
-
-// 保存搜索条件
-function saveSearchCondition() {
-    const name = prompt('请输入搜索条件名称：');
-    if (!name) return;
-    
-    const searchConfig = {
-        name: name,
-        conditions: [...advancedSearchConditions],
-        logic: document.getElementById('conditionLogic').value,
-        timestamp: Date.now()
-    };
-    
-    // 添加到搜索历史
-    searchHistory.unshift(searchConfig);
-    if (searchHistory.length > 20) {
-        searchHistory.pop();
-    }
-    
-    // 保存到本地存储
-    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
-    
-    showNotification('搜索条件已保存', 'success');
-    loadSearchHistory();
-}
-
-// 重置高级搜索
-function resetAdvancedSearch() {
-    advancedSearchConditions = [];
-    renderSearchConditions();
-    document.getElementById('searchField').value = 'all';
-    document.getElementById('searchValue').value = '';
-    document.getElementById('searchOperator').value = 'contains';
-    document.getElementById('caseSensitive').checked = false;
-    document.getElementById('enableRegexSearch').checked = false;
-    document.getElementById('conditionLogic').value = 'AND';
-    document.getElementById('regexHelp').style.display = 'none';
-}
-
-// 加载搜索历史
-function loadSearchHistory() {
-    try {
-        const saved = localStorage.getItem('webhookSearchHistory');
-        if (saved) {
-            searchHistory = JSON.parse(saved);
-        }
-    } catch (error) {
-        console.error('加载搜索历史失败:', error);
-        searchHistory = [];
-    }
-    
-    renderSearchHistory();
-}
-
-// 渲染搜索历史
-function renderSearchHistory() {
-    const container = document.getElementById('searchHistory');
-    
-    if (searchHistory.length === 0) {
-        container.innerHTML = '<div class="no-history">暂无搜索历史</div>';
-        return;
-    }
-    
-    container.innerHTML = searchHistory.map((item, index) => `
-        <div class="search-history-item" onclick="loadSearchFromHistory(${index})">
-            <div class="history-name">${item.name}</div>
-            <div class="history-details">
-                条件数: ${item.conditions.length} | 
-                逻辑: ${item.logic} | 
-                时间: ${new Date(item.timestamp).toLocaleString()}
-            </div>
-            <div class="history-actions">
-                <button onclick="event.stopPropagation(); deleteSearchHistory(${index})" class="btn btn-small btn-danger">删除</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// 从历史记录加载搜索
-function loadSearchFromHistory(index) {
-    const searchConfig = searchHistory[index];
-    if (!searchConfig) return;
-    
-    // 加载搜索条件
-    advancedSearchConditions = [...searchConfig.conditions];
-    renderSearchConditions();
-    
-    // 设置逻辑
-    document.getElementById('conditionLogic').value = searchConfig.logic;
-    
-    showNotification('已加载搜索条件', 'info');
-}
-
-// 删除搜索历史
-function deleteSearchHistory(index) {
-    searchHistory.splice(index, 1);
-    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
-    renderSearchHistory();
-    showNotification('搜索历史已删除', 'success');
-}
-
-// 清空搜索历史
-function clearSearchHistory() {
-    if (confirm('确定要清空所有搜索历史吗？')) {
-        searchHistory = [];
-        localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
-        renderSearchHistory();
-        showNotification('搜索历史已清空', 'success');
-    }
-}
-
-// 清除当前高级搜索
-function clearAdvancedSearch() {
-    currentAdvancedSearch = null;
-    logs = [...allLogs];
-    renderLogs();
-    updateSearchResultInfo();
-    
-    // 隐藏清除高级搜索按钮
-    document.getElementById('clearAdvancedSearchBtn').style.display = 'none';
-    
-    showNotification('已清除高级搜索', 'info');
-}
-
-// ==================== 快速过滤功能 ====================
-
-// 打开快速过滤模态框
-function openQuickFilterModal() {
-    document.getElementById('quickFilterModal').style.display = 'block';
-    loadSavedQuickFilters();
-    initializeQuickFilters();
-}
-
-// 关闭快速过滤模态框
-function closeQuickFilterModal() {
-    document.getElementById('quickFilterModal').style.display = 'none';
-    resetQuickFilterSelection();
-}
-
-// 初始化快速过滤
-function initializeQuickFilters() {
-    // 清除之前的选择
-    resetQuickFilterSelection();
-    
-    // 绑定快速过滤项点击事件
-    document.querySelectorAll('.quick-filter-item').forEach(item => {
-        item.addEventListener('click', function() {
-            toggleQuickFilterSelection(this);
-        });
-    });
-}
-
-// 重置快速过滤选择
-function resetQuickFilterSelection() {
-    document.querySelectorAll('.quick-filter-item').forEach(item => {
-        item.classList.remove('selected');
-    });
-    quickFilters = [];
-}
-
-// 切换快速过滤选择
-function toggleQuickFilterSelection(element) {
-    const filterType = element.dataset.filter;
-    
-    if (element.classList.contains('selected')) {
-        // 取消选择
-        element.classList.remove('selected');
-        quickFilters = quickFilters.filter(f => f.type !== filterType);
-    } else {
-        // 选择
-        element.classList.add('selected');
-        quickFilters.push({
-            type: filterType,
-            name: element.querySelector('.filter-title').textContent,
-            description: element.querySelector('.filter-desc').textContent
-        });
-    }
-}
-
-// 应用快速过滤
-function applyQuickFilter() {
-    if (quickFilters.length === 0) {
-        showNotification('请选择至少一个过滤条件', 'warning');
-        return;
-    }
-    
-    // 保存当前过滤到历史
-    saveQuickFilterToHistory();
-    
-    // 应用过滤到日志
-    applyQuickFilterToLogs();
-    
-    // 关闭模态框
-    closeQuickFilterModal();
-    
-    showNotification(`已应用 ${quickFilters.length} 个快速过滤条件`, 'success');
-}
-
-// 应用快速过滤到日志
-function applyQuickFilterToLogs() {
-    if (quickFilters.length === 0) return;
-    
-    // 保存当前过滤状态
-    currentQuickFilter = [...quickFilters];
-    
-    // 过滤日志
-    logs = allLogs.filter(log => {
-        return quickFilters.every(filter => {
-            return evaluateQuickFilter(log, filter);
-        });
-    });
-    
-    // 渲染过滤后的日志
-    renderLogs();
-    updateSearchResultInfo();
-    
-    // 显示清除快速过滤按钮
-    document.getElementById('clearQuickFilterBtn').style.display = 'inline-block';
-}
-
-// 评估快速过滤条件
-function evaluateQuickFilter(log, filter) {
-    switch (filter.type) {
-        case 'success':
-            return log.status >= 200 && log.status < 300;
-        case 'error':
-            return log.status >= 400 && log.status < 600;
-        case 'timeout':
-            return log.responseTime > 5000; // 5秒
-        case 'recent':
-            const oneHourAgo = Date.now() - (60 * 60 * 1000);
-            return log.timestamp > oneHourAgo;
-        case 'mobile':
-            return log.headers && log.headers['user-agent'] && 
-                   log.headers['user-agent'].toLowerCase().includes('mobile');
-        case 'bot':
-            return log.headers && log.headers['user-agent'] && 
-                   log.headers['user-agent'].toLowerCase().includes('bot');
-        case 'api':
-            return log.headers && log.headers['content-type'] && 
-                   log.headers['content-type'].toLowerCase().includes('json');
-        case 'large':
-            return log.body && log.body.length > 1024 * 1024; // 1MB
-        default:
-            return true;
-    }
-}
-
-// 清除快速过滤
-function clearQuickFilter() {
-    currentQuickFilter = null;
-    logs = [...allLogs];
-    renderLogs();
-    updateSearchResultInfo();
-    
-    // 隐藏清除快速过滤按钮
-    document.getElementById('clearQuickFilterBtn').style.display = 'none';
-    
-    showNotification('已清除快速过滤', 'info');
-}
-
-// 添加自定义过滤
-function addCustomFilter() {
-    const name = document.getElementById('customFilterName').value.trim();
-    const condition = document.getElementById('customFilterCondition').value.trim();
-    
-    if (!name || !condition) {
-        showNotification('请填写过滤名称和条件', 'warning');
-        return;
-    }
-    
-    // 验证条件格式
-    if (!validateCustomFilterCondition(condition)) {
-        showNotification('过滤条件格式不正确', 'error');
-        return;
-    }
-    
-    // 添加到已保存的快速过滤
-    const customFilter = {
-        name: name,
-        condition: condition,
-        timestamp: Date.now()
-    };
-    
-    savedQuickFilters.push(customFilter);
-    localStorage.setItem('webhookQuickFilters', JSON.stringify(savedQuickFilters));
-    
-    // 清空表单
-    document.getElementById('customFilterName').value = '';
-    document.getElementById('customFilterCondition').value = '';
-    
-    // 重新渲染
-    renderSavedQuickFilters();
-    
-    showNotification('自定义过滤已添加', 'success');
-}
-
-// 验证自定义过滤条件
-function validateCustomFilterCondition(condition) {
-    // 简单的条件格式验证
-    const validOperators = ['=', '!=', '>', '<', '>=', '<=', 'contains', 'startsWith', 'endsWith'];
-    const hasValidOperator = validOperators.some(op => condition.includes(op));
-    
-    return hasValidOperator && condition.includes('AND') || condition.includes('OR') || !condition.includes('AND') && !condition.includes('OR');
-}
-
-// 保存快速过滤到历史
-function saveQuickFilterToHistory() {
-    const filterHistory = {
-        filters: [...quickFilters],
-        timestamp: Date.now()
-    };
-    
-    // 从localStorage加载历史
-    let history = [];
-    try {
-        const saved = localStorage.getItem('webhookQuickFilterHistory');
-        if (saved) {
-            history = JSON.parse(saved);
-        }
-    } catch (error) {
-        console.error('加载快速过滤历史失败:', error);
-    }
-    
-    // 添加到历史开头
-    history.unshift(filterHistory);
-    
-    // 只保留最近20条记录
-    if (history.length > 20) {
-        history = history.slice(0, 20);
-    }
-    
-    // 保存到localStorage
-    localStorage.setItem('webhookQuickFilterHistory', JSON.stringify(history));
-}
-
-// 加载已保存的快速过滤
-function loadQuickFilters() {
-    try {
-        const saved = localStorage.getItem('webhookQuickFilters');
-        if (saved) {
-            savedQuickFilters = JSON.parse(saved);
-        }
-    } catch (error) {
-        console.error('加载快速过滤失败:', error);
-        savedQuickFilters = [];
-    }
-}
-
-// 加载已保存的快速过滤到界面
-function loadSavedQuickFilters() {
-    loadQuickFilters();
-    renderSavedQuickFilters();
-}
-
-// 渲染已保存的快速过滤
-function renderSavedQuickFilters() {
-    const container = document.getElementById('savedQuickFilters');
-    
-    if (savedQuickFilters.length === 0) {
-        container.innerHTML = '<div class="no-filters">暂无已保存的快速过滤</div>';
-        return;
-    }
-    
-    container.innerHTML = savedQuickFilters.map((filter, index) => `
-        <div class="saved-filter-item">
-            <div class="filter-name">${filter.name}</div>
-            <div class="filter-condition">${filter.condition}</div>
-            <div class="filter-actions">
-                <button onclick="applySavedQuickFilter(${index})" class="btn btn-small btn-primary">应用</button>
-                <button onclick="deleteSavedQuickFilter(${index})" class="btn btn-small btn-danger">删除</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// 应用已保存的快速过滤
-function applySavedQuickFilter(index) {
-    const filter = savedQuickFilters[index];
-    if (!filter) return;
-    
-    // 解析自定义条件并应用
-    try {
-        const parsedCondition = parseCustomFilterCondition(filter.condition);
-        if (parsedCondition) {
-            // 应用自定义过滤
-            applyCustomFilterCondition(parsedCondition);
-            closeQuickFilterModal();
-            showNotification(`已应用自定义过滤: ${filter.name}`, 'success');
-        }
-    } catch (error) {
-        console.error('应用自定义过滤失败:', error);
-        showNotification('应用自定义过滤失败', 'error');
-    }
-}
-
-// 删除已保存的快速过滤
-function deleteSavedQuickFilter(index) {
-    if (confirm('确定要删除这个快速过滤吗？')) {
-        savedQuickFilters.splice(index, 1);
-        localStorage.setItem('webhookQuickFilters', JSON.stringify(savedQuickFilters));
-        renderSavedQuickFilters();
-        showNotification('快速过滤已删除', 'success');
-    }
-}
-
-// 解析自定义过滤条件
-function parseCustomFilterCondition(condition) {
-    // 简单的条件解析器
-    // 支持格式: field = value AND field2 != value2 OR field3 > value3
-    try {
-        const parts = condition.split(/\s+(AND|OR)\s+/i);
-        const result = {
-            conditions: [],
-            logic: 'AND'
-        };
-        
-        for (let i = 0; i < parts.length; i++) {
-            if (parts[i].toUpperCase() === 'AND' || parts[i].toUpperCase() === 'OR') {
-                result.logic = parts[i].toUpperCase();
-            } else if (parts[i].trim()) {
-                const conditionPart = parts[i].trim();
-                const match = conditionPart.match(/(\w+)\s*([=!<>]=?|contains|startsWith|endsWith)\s*(.+)/);
-                if (match) {
-                    result.conditions.push({
-                        field: match[1],
-                        operator: match[2],
-                        value: match[3].replace(/['"]/g, '')
-                    });
-                }
-            }
-        }
-        
-        return result.conditions.length > 0 ? result : null;
-    } catch (error) {
-        console.error('解析自定义过滤条件失败:', error);
-        return null;
-    }
-}
-
-// 应用自定义过滤条件
-function applyCustomFilterCondition(parsedCondition) {
-    if (!parsedCondition || !parsedCondition.conditions) return;
-    
-    // 过滤日志
-    logs = allLogs.filter(log => {
-        return parsedCondition.conditions.every(condition => {
-            return evaluateCustomFilterCondition(log, condition);
-        });
-    });
-    
-    // 渲染过滤后的日志
-    renderLogs();
-    updateSearchResultInfo();
-    
-    // 显示清除快速过滤按钮
-    document.getElementById('clearQuickFilterBtn').style.display = 'inline-block';
-}
-
-// 评估自定义过滤条件
-function evaluateCustomFilterCondition(log, condition) {
-    const field = condition.field;
-    const operator = condition.operator;
-    const value = condition.value;
-    
-    let fieldValue;
-    
-    // 获取字段值
-    switch (field.toLowerCase()) {
-        case 'tenantid':
-            fieldValue = log.tenantId;
-            break;
-        case 'uniqueid':
-            fieldValue = log.uniqueId;
-            break;
-        case 'status':
-            fieldValue = log.status;
-            break;
-        case 'method':
-            fieldValue = log.method;
-            break;
-        case 'url':
-            fieldValue = log.url;
-            break;
-        case 'ip':
-            fieldValue = log.ip;
-            break;
-        case 'responseTime':
-            fieldValue = log.responseTime;
-            break;
-        default:
-            fieldValue = '';
-    }
-    
-    // 根据操作符进行比较
-    switch (operator) {
-        case '=':
-            return fieldValue == value;
-        case '!=':
-            return fieldValue != value;
-        case '>':
-            return fieldValue > value;
-        case '<':
-            return fieldValue < value;
-        case '>=':
-            return fieldValue >= value;
-        case '<=':
-            return fieldValue <= value;
-        case 'contains':
-            return String(fieldValue).toLowerCase().includes(value.toLowerCase());
-        case 'startsWith':
-            return String(fieldValue).toLowerCase().startsWith(value.toLowerCase());
-        case 'endsWith':
-            return String(fieldValue).toLowerCase().endsWith(value.toLowerCase());
-        default:
-            return true;
-    }
-}
-
-// 打开系统监控页面
-function openSystemMonitor() {
-    window.open('system-monitor.html', '_blank');
-}
-
-// 绑定数据清理相关事件
-document.getElementById('dataCleanupBtn').addEventListener('click', openDataCleanupModal);
-document.getElementById('triggerCleanupBtn').addEventListener('click', triggerCleanup);
-document.getElementById('clearAllDataBtn').addEventListener('click', showConfirmClearAllModal);
-document.getElementById('refreshStatsBtn').addEventListener('click', refreshCleanupStats);
-document.getElementById('saveCleanupConfigBtn').addEventListener('click', saveCleanupConfig);
-document.getElementById('confirmClearAllBtn').addEventListener('click', confirmClearAllData);
-
-// 打开数据清理管理模态框
-function openDataCleanupModal() {
-    document.getElementById('dataCleanupModal').style.display = 'block';
-    loadCleanupConfig();
-    refreshCleanupStats();
-}
-
-// 关闭数据清理管理模态框
-function closeDataCleanupModal() {
-    document.getElementById('dataCleanupModal').style.display = 'none';
-}
-
-// 加载数据清理配置
-async function loadCleanupConfig() {
-    try {
-        const response = await fetch('/api/cleanup/config');
-        const result = await response.json();
-        
-        if (result.success) {
-            const config = result.data;
-            
-            document.getElementById('enableCleanup').checked = config.enabled;
-            document.getElementById('cleanupInterval').value = config.interval / (60 * 1000);
-            document.getElementById('maxLogsPerWebhook').value = config.maxLogsPerWebhook;
-            document.getElementById('maxLogAge').value = config.maxLogAge / (60 * 60 * 1000);
-            document.getElementById('cleanupThreshold').value = config.cleanupThreshold;
-        }
-    } catch (error) {
-        console.error('加载数据清理配置失败:', error);
-        showNotification('加载配置失败', 'error');
-    }
-}
-
-// 保存数据清理配置
-async function saveCleanupConfig() {
-    try {
-        const config = {
-            enabled: document.getElementById('enableCleanup').checked,
-            interval: parseInt(document.getElementById('cleanupInterval').value) * 60 * 1000,
-            maxLogsPerWebhook: parseInt(document.getElementById('maxLogsPerWebhook').value),
-            maxLogAge: parseInt(document.getElementById('maxLogAge').value) * 60 * 60 * 1000,
-            cleanupThreshold: parseFloat(document.getElementById('cleanupThreshold').value)
-        };
-        
-        const response = await fetch('/api/cleanup/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('配置已保存', 'success');
-            addCleanupHistory('配置更新', '配置已更新');
-        } else {
-            showNotification('保存失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存数据清理配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
-}
-
-// 刷新清理统计信息
-async function refreshCleanupStats() {
-    try {
-        const response = await fetch('/api/cleanup/stats');
-        const result = await response.json();
-        
-        if (result.success) {
-            cleanupStats = result.data;
-            updateCleanupStatsDisplay();
-        }
-    } catch (error) {
-        console.error('刷新统计信息失败:', error);
-        showNotification('刷新统计失败', 'error');
-    }
-}
-
-// 更新清理统计显示
-function updateCleanupStatsDisplay() {
-    if (!cleanupStats) return;
-    
-    document.getElementById('totalLogsCount').textContent = cleanupStats.dataCounts.totalLogs.toLocaleString();
-    document.getElementById('totalAlertsCount').textContent = cleanupStats.dataCounts.totalAlerts.toLocaleString();
-    document.getElementById('webhookCount').textContent = cleanupStats.dataCounts.webhookCount.toLocaleString();
-    document.getElementById('memoryUsage').textContent = cleanupStats.memoryUsage.heapUsed + ' MB';
-}
-
-// 触发数据清理
-async function triggerCleanup() {
-    try {
-        const response = await fetch('/api/cleanup/trigger', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('数据清理已触发', 'success');
-            addCleanupHistory('手动清理', '数据清理已触发');
-            
-            // 延迟刷新统计信息
-            setTimeout(() => {
-                refreshCleanupStats();
-            }, 2000);
-        } else {
-            showNotification('触发清理失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('触发数据清理失败:', error);
-        showNotification('触发清理失败: ' + error.message, 'error');
-    }
-}
-
-// 显示确认清理所有数据的模态框
-function showConfirmClearAllModal() {
-    document.getElementById('confirmClearAllModal').style.display = 'block';
-}
-
-// 关闭确认清理所有数据的模态框
-function closeConfirmClearAllModal() {
-    document.getElementById('confirmClearAllModal').style.display = 'none';
-}
-
-// 确认清理所有数据
-async function confirmClearAllData() {
-    try {
-        const response = await fetch('/api/cleanup/clear-all', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('所有数据已清理完成', 'success');
-            addCleanupHistory('清理所有数据', '所有数据已清理');
-            
-            // 关闭确认模态框
-            closeConfirmClearAllModal();
-            
-            // 刷新页面数据
-            setTimeout(() => {
-                loadWebhooks();
-                refreshCleanupStats();
-            }, 1000);
-        } else {
-            showNotification('清理失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('清理所有数据失败:', error);
-        showNotification('清理失败: ' + error.message, 'error');
-    }
-}
-
-// 添加清理历史记录
-function addCleanupHistory(action, message) {
-    const historyItem = {
-        id: Date.now(),
-        timestamp: new Date().toISOString(),
-        action: action,
-        message: message
-    };
-    
-    cleanupHistory.unshift(historyItem);
-    
-    // 只保留最近20条记录
-    if (cleanupHistory.length > 20) {
-        cleanupHistory = cleanupHistory.slice(0, 20);
-    }
-    
-    updateCleanupHistoryDisplay();
-}
-
-// 更新清理历史显示
-function updateCleanupHistoryDisplay() {
-    const historyContainer = document.getElementById('cleanupHistory');
-    
-    if (cleanupHistory.length === 0) {
-        historyContainer.innerHTML = '<div class="no-history">暂无清理记录</div>';
-        return;
-    }
-    
-    const historyHtml = cleanupHistory.map(item => `
-        <div class="history-item">
-            <div class="history-info">
-                <div class="history-action">${item.action}</div>
-                <div class="history-time">${formatDateTime(item.timestamp)}</div>
-            </div>
-        </div>
-    `).join('');
-    
-    historyContainer.innerHTML = historyHtml;
-}
-
-// 监听数据清理事件
-socket.on('data-cleared', function(data) {
-    console.log('📨 收到数据清理通知:', data);
-    showNotification(data.message, 'success');
-    addCleanupHistory('系统清理', data.message);
-    
-    // 刷新页面数据
-    setTimeout(() => {
-        loadWebhooks();
-        if (cleanupStats) {
-            refreshCleanupStats();
-        }
-    }, 1000);
-});
-
-// 绑定内存优化相关事件
-document.getElementById('memoryOptimizeBtn').addEventListener('click', openMemoryOptimizeModal);
-document.getElementById('triggerGcBtn').addEventListener('click', triggerGarbageCollection);
-document.getElementById('triggerMonitorBtn').addEventListener('click', triggerMemoryMonitor);
-document.getElementById('emergencyCleanupBtn').addEventListener('click', triggerEmergencyCleanup);
-document.getElementById('refreshMemoryBtn').addEventListener('click', refreshMemoryStatus);
-document.getElementById('saveMemoryConfigBtn').addEventListener('click', saveMemoryConfig);
-
-// 绑定界面交互优化相关事件
-document.getElementById('asyncManageBtn').addEventListener('click', openAsyncManageModal);
-document.getElementById('compressionManageBtn').addEventListener('click', openCompressionManageModal);
-document.getElementById('triggerAsyncTaskBtn').addEventListener('click', triggerAsyncTask);
-document.getElementById('clearQueueBtn').addEventListener('click', clearAsyncQueue);
-document.getElementById('refreshAsyncStatsBtn').addEventListener('click', refreshAsyncStats);
-document.getElementById('saveAsyncConfigBtn').addEventListener('click', saveAsyncConfig);
-document.getElementById('testCompressionBtn').addEventListener('click', testCompression);
-document.getElementById('resetCompressionStatsBtn').addEventListener('click', resetCompressionStats);
-document.getElementById('refreshCompressionStatsBtn').addEventListener('click', refreshCompressionStats);
-document.getElementById('saveCompressionConfigBtn').addEventListener('click', saveCompressionConfig);
-
-// 打开内存优化管理模态框
-function openMemoryOptimizeModal() {
-    document.getElementById('memoryOptimizeModal').style.display = 'block';
-    loadMemoryConfig();
-    refreshMemoryStatus();
-    initMemoryChart();
-}
-
-// 关闭内存优化管理模态框
-function closeMemoryOptimizeModal() {
-    document.getElementById('memoryOptimizeModal').style.display = 'none';
-}
-
-// 加载内存优化配置
-async function loadMemoryConfig() {
-    try {
-        const response = await fetch('/api/memory/config');
-        const result = await response.json();
-        
-        if (result.success) {
-            memoryConfig = result.data;
-            
-            document.getElementById('enableMemoryMonitor').checked = memoryConfig.enabled;
-            document.getElementById('monitorInterval').value = memoryConfig.monitorInterval / 1000;
-            document.getElementById('warningThreshold').value = memoryConfig.warningThreshold;
-            document.getElementById('criticalThreshold').value = memoryConfig.criticalThreshold;
-            document.getElementById('gcThreshold').value = memoryConfig.gcThreshold;
-            document.getElementById('enableLeakDetection').checked = memoryConfig.leakDetection.enabled;
-        }
-    } catch (error) {
-        console.error('加载内存优化配置失败:', error);
-        showNotification('加载配置失败', 'error');
-    }
-}
-
-// 保存内存优化配置
-async function saveMemoryConfig() {
-    try {
-        const config = {
-            enabled: document.getElementById('enableMemoryMonitor').checked,
-            monitorInterval: parseInt(document.getElementById('monitorInterval').value) * 1000,
-            warningThreshold: parseFloat(document.getElementById('warningThreshold').value),
-            criticalThreshold: parseFloat(document.getElementById('criticalThreshold').value),
-            gcThreshold: parseFloat(document.getElementById('gcThreshold').value),
-            leakDetection: {
-                enabled: document.getElementById('enableLeakDetection').checked
-            }
-        };
-        
-        const response = await fetch('/api/memory/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('配置已保存', 'success');
-            addMemoryHistory('配置更新', '内存优化配置已更新');
-        } else {
-            showNotification('保存失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存内存优化配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
-}
-
-// 刷新内存状态
-async function refreshMemoryStatus() {
-    try {
-        const response = await fetch('/api/memory/status');
-        const result = await response.json();
-        
-        if (result.success) {
-            memoryStatus = result.data;
-            updateMemoryDisplay();
-            updateMemoryChart();
-        }
-    } catch (error) {
-        console.error('刷新内存状态失败:', error);
-        showNotification('刷新状态失败', 'error');
-    }
-}
-
-// 更新内存显示
-function updateMemoryDisplay() {
-    if (!memoryStatus) return;
-    
-    const current = memoryStatus.current;
-    const heapUsageRate = current.heapUsageRate;
-    
-    // 更新内存值显示
-    document.getElementById('heapUsedValue').textContent = current.heapUsed + ' MB';
-    document.getElementById('heapTotalValue').textContent = current.heapTotal + ' MB';
-    document.getElementById('rssValue').textContent = current.rss + ' MB';
-    document.getElementById('externalValue').textContent = current.external + ' MB';
-    
-    // 更新内存使用率条
-    const heapUsedBar = document.getElementById('heapUsedBar');
-    const percentage = (heapUsageRate * 100).toFixed(1);
-    heapUsedBar.style.width = percentage + '%';
-    
-    // 根据使用率设置颜色
-    if (heapUsageRate > memoryStatus.config.criticalThreshold) {
-        heapUsedBar.style.background = '#F44336';
-    } else if (heapUsageRate > memoryStatus.config.warningThreshold) {
-        heapUsedBar.style.background = '#FF9800';
-    } else {
-        heapUsedBar.style.background = '#4CAF50';
-    }
-    
-    // 更新内存警告
-    updateMemoryWarnings();
-}
-
-// 更新内存警告
-function updateMemoryWarnings() {
-    const warningsContainer = document.getElementById('memoryWarnings');
-    let warningsHtml = '';
-    
-    if (memoryStatus.warning) {
-        warningsHtml += `
-            <div class="memory-warning warning">
-                ⚠️ 内存使用率较高: ${(memoryStatus.current.heapUsageRate * 100).toFixed(1)}%
-            </div>
+            <button class="alert-close" onclick="removeAlert('${alert.timestamp}')">×</button>
         `;
-    }
-    
-    if (memoryStatus.critical) {
-        warningsHtml += `
-            <div class="memory-warning critical">
-                🚨 内存使用率严重超标: ${(memoryStatus.current.heapUsageRate * 100).toFixed(1)}%
-            </div>
-        `;
-    }
-    
-    if (memoryStatus.leakWarning) {
-        warningsHtml += `
-            <div class="memory-warning leak">
-                🔍 检测到可能的内存泄漏，建议检查代码
-            </div>
-        `;
-    }
-    
-    warningsContainer.innerHTML = warningsHtml;
-}
-
-// 初始化内存图表
-function initMemoryChart() {
-    const ctx = document.getElementById('memoryChart').getContext('2d');
-    
-    memoryChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '堆内存使用 (MB)',
-                data: [],
-                borderColor: '#4CAF50',
-                backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                tension: 0.4
-            }, {
-                label: 'RSS内存 (MB)',
-                data: [],
-                borderColor: '#2196F3',
-                backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: '内存使用 (MB)'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: '时间'
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'top'
-                }
-            }
-        }
+        container.appendChild(div);
     });
 }
 
-// 更新内存图表
-function updateMemoryChart() {
-    if (!memoryChart || !memoryStatus) return;
-    
-    const history = memoryStatus.history;
-    if (history.length === 0) return;
-    
-    const labels = history.map(item => {
-        const date = new Date(item.timestamp);
-        return date.toLocaleTimeString();
-    });
-    
-    const heapData = history.map(item => Math.round(item.heapUsed / 1024 / 1024));
-    const rssData = history.map(item => Math.round(item.rss / 1024 / 1024));
-    
-    memoryChart.data.labels = labels;
-    memoryChart.data.datasets[0].data = heapData;
-    memoryChart.data.datasets[1].data = rssData;
-    
-    memoryChart.update();
+// 移除告警
+function removeAlert(timestamp) {
+    alerts = alerts.filter(alert => alert.timestamp !== timestamp);
+    updateAlertsDisplay();
 }
 
-// 触发垃圾回收
-async function triggerGarbageCollection() {
-    try {
-        const response = await fetch('/api/memory/gc', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('垃圾回收已触发', 'success');
-            addMemoryHistory('垃圾回收', '手动触发垃圾回收');
-            
-            // 延迟刷新状态
-            setTimeout(() => {
-                refreshMemoryStatus();
-            }, 2000);
-        } else {
-            showNotification('触发失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('触发垃圾回收失败:', error);
-        showNotification('触发失败: ' + error.message, 'error');
-    }
-}
-
-// 触发内存监控
-async function triggerMemoryMonitor() {
-    try {
-        const response = await fetch('/api/memory/monitor', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('内存监控已触发', 'success');
-            addMemoryHistory('监控触发', '手动触发内存监控');
-            
-            // 延迟刷新状态
-            setTimeout(() => {
-                refreshMemoryStatus();
-            }, 1000);
-        } else {
-            showNotification('触发失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('触发内存监控失败:', error);
-        showNotification('触发失败: ' + error.message, 'error');
-    }
-}
-
-// 触发紧急清理
-async function triggerEmergencyCleanup() {
-    try {
-        const response = await fetch('/api/memory/emergency-cleanup', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('紧急内存清理已执行', 'success');
-            addMemoryHistory('紧急清理', '执行紧急内存清理');
-            
-            // 延迟刷新状态
-            setTimeout(() => {
-                refreshMemoryStatus();
-            }, 3000);
-        } else {
-            showNotification('执行失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('执行紧急内存清理失败:', error);
-        showNotification('执行失败: ' + error.message, 'error');
-    }
-}
-
-// 添加内存操作历史
-function addMemoryHistory(action, message) {
-    const historyItem = {
-        id: Date.now(),
-        timestamp: new Date().toISOString(),
-        action: action,
-        message: message
-    };
-    
-    memoryHistory.unshift(historyItem);
-    
-    // 只保留最近20条记录
-    if (memoryHistory.length > 20) {
-        memoryHistory = memoryHistory.slice(0, 20);
-    }
-    
-    updateMemoryHistoryDisplay();
-}
-
-// 更新内存历史显示
-function updateMemoryHistoryDisplay() {
-    const historyContainer = document.getElementById('memoryHistory');
-    
-    if (memoryHistory.length === 0) {
-        historyContainer.innerHTML = '<div class="no-history">暂无操作记录</div>';
-        return;
-    }
-    
-    const historyHtml = memoryHistory.map(item => `
-        <div class="history-item">
-            <div class="history-info">
-                <div class="history-action">${item.action}</div>
-                <div class="history-time">${formatDateTime(item.timestamp)}</div>
-            </div>
-        </div>
-    `).join('');
-    
-    historyContainer.innerHTML = historyHtml;
-}
-
-// 监听内存相关事件
-socket.on('memory-status', function(data) {
-    console.log('📨 收到内存状态更新:', data);
-    memoryStatus = data;
-    updateMemoryDisplay();
-    updateMemoryChart();
-});
-
-socket.on('memory-leak-warning', function(data) {
-    console.log('🚨 收到内存泄漏警告:', data);
-    showNotification(data.message, 'warning');
-    addMemoryHistory('内存泄漏警告', data.message);
-});
-
-socket.on('garbage-collection', function(data) {
-    console.log('🔄 收到垃圾回收结果:', data);
-    showNotification(`垃圾回收完成，释放内存: ${data.freedMemory}MB`, 'success');
-    addMemoryHistory('垃圾回收', `释放内存: ${data.freedMemory}MB`);
-});
-
-socket.on('emergency-cleanup', function(data) {
-    console.log('🚨 收到紧急清理通知:', data);
-    showNotification(data.message, 'warning');
-    addMemoryHistory('紧急清理', data.message);
-});
-
-// 异步管理模态框
-function openAsyncManageModal() {
-    document.getElementById('asyncManageModal').style.display = 'block';
-    loadAsyncConfig();
-    refreshAsyncStats();
-}
-
-function closeAsyncManageModal() {
-    document.getElementById('asyncManageModal').style.display = 'none';
-}
-
-// 压缩管理模态框
-function openCompressionManageModal() {
-    document.getElementById('compressionManageModal').style.display = 'block';
-    loadCompressionConfig();
-    refreshCompressionStats();
-}
-
-function closeCompressionManageModal() {
-    document.getElementById('compressionManageModal').style.display = 'none';
-}
-
-// 加载异步配置
-async function loadAsyncConfig() {
-    try {
-        const response = await fetch('/api/async/config');
-        const result = await response.json();
-        
-        if (result.success) {
-            asyncConfig = result.data;
-            
-            document.getElementById('enableAsync').checked = asyncConfig.enabled;
-            document.getElementById('maxConcurrent').value = asyncConfig.maxConcurrent;
-            document.getElementById('queueSize').value = asyncConfig.queueSize;
-            document.getElementById('retryAttempts').value = asyncConfig.retryAttempts;
-            document.getElementById('retryDelay').value = asyncConfig.retryDelay;
-        }
-    } catch (error) {
-        console.error('加载异步配置失败:', error);
-        showNotification('加载配置失败', 'error');
-    }
-}
-
-// 保存异步配置
-async function saveAsyncConfig() {
-    try {
-        const config = {
-            enabled: document.getElementById('enableAsync').checked,
-            maxConcurrent: parseInt(document.getElementById('maxConcurrent').value),
-            queueSize: parseInt(document.getElementById('queueSize').value),
-            retryAttempts: parseInt(document.getElementById('retryAttempts').value),
-            retryDelay: parseInt(document.getElementById('retryDelay').value)
-        };
-        
-        const response = await fetch('/api/async/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('配置已保存', 'success');
-        } else {
-            showNotification('保存失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存异步配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
-}
-
-// 刷新异步统计
-async function refreshAsyncStats() {
-    try {
-        const response = await fetch('/api/async/status');
-        const result = await response.json();
-        
-        if (result.success) {
-            asyncStats = result.data;
-            updateAsyncStatsDisplay();
-        }
-    } catch (error) {
-        console.error('刷新异步统计失败:', error);
-        showNotification('刷新统计失败', 'error');
-    }
-}
-
-// 更新异步统计显示
-function updateAsyncStatsDisplay() {
-    if (!asyncStats) return;
-    
-    document.getElementById('queueLength').textContent = asyncStats.queueLength;
-    document.getElementById('activeWorkers').textContent = asyncStats.activeWorkers;
-    document.getElementById('totalProcessed').textContent = asyncStats.totalProcessed.toLocaleString();
-    document.getElementById('totalFailed').textContent = asyncStats.totalFailed.toLocaleString();
-}
-
-// 触发异步任务
-async function triggerAsyncTask() {
-    try {
-        const webhookId = 'test'; // 使用测试webhook ID
-        const priority = 'normal';
-        
-        const response = await fetch('/api/async/trigger', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ webhookId, priority })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('测试任务已触发', 'success');
-            setTimeout(() => refreshAsyncStats(), 1000);
-        } else {
-            showNotification('触发失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('触发异步任务失败:', error);
-        showNotification('触发失败: ' + error.message, 'error');
-    }
-}
-
-// 清空异步队列
-async function clearAsyncQueue() {
-    try {
-        const response = await fetch('/api/async/clear-queue', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('队列已清空', 'success');
-            setTimeout(() => refreshAsyncStats(), 1000);
-        } else {
-            showNotification('清空失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('清空异步队列失败:', error);
-        showNotification('清空失败: ' + error.message, 'error');
-    }
-}
-
-// 加载压缩配置
-async function loadCompressionConfig() {
-    try {
-        const response = await fetch('/api/compression/config');
-        const result = await response.json();
-        
-        if (result.success) {
-            compressionConfig = result.data;
-            
-            document.getElementById('enableCompression').checked = compressionConfig.enabled;
-            document.getElementById('compressionThreshold').value = compressionConfig.threshold;
-            document.getElementById('compressionLevel').value = compressionConfig.level;
-            document.getElementById('windowBits').value = compressionConfig.windowBits;
-            document.getElementById('memLevel').value = compressionConfig.memLevel;
-        }
-    } catch (error) {
-        console.error('加载压缩配置失败:', error);
-        showNotification('加载配置失败', 'error');
-    }
-}
-
-// 保存压缩配置
-async function saveCompressionConfig() {
-    try {
-        const config = {
-            enabled: document.getElementById('enableCompression').checked,
-            threshold: parseInt(document.getElementById('compressionThreshold').value),
-            level: parseInt(document.getElementById('compressionLevel').value),
-            windowBits: parseInt(document.getElementById('windowBits').value),
-            memLevel: parseInt(document.getElementById('memLevel').value)
-        };
-        
-        const response = await fetch('/api/compression/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('配置已保存', 'success');
-        } else {
-            showNotification('保存失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存压缩配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
-}
-
-// 刷新压缩统计
-async function refreshCompressionStats() {
-    try {
-        const response = await fetch('/api/compression/stats');
-        const result = await response.json();
-        
-        if (result.success) {
-            compressionStats = result.data;
-            updateCompressionStatsDisplay();
-        }
-    } catch (error) {
-        console.error('刷新压缩统计失败:', error);
-        showNotification('刷新统计失败', 'error');
-        // 模拟数据用于演示
-        updateCompressionStatsDisplay({
-            totalRequests: 1250,
-            compressedRequests: 980,
-            totalBytesSaved: 15.6,
-            averageCompressionRatio: 68.5
-        });
-    }
-}
-
-// 更新压缩统计显示
-function updateCompressionStatsDisplay(stats = null) {
-    if (stats) {
-        compressionStats = stats;
-    }
-    
-    if (!compressionStats) return;
-    
-    document.getElementById('totalRequests').textContent = compressionStats.totalRequests.toLocaleString();
-    document.getElementById('compressedRequests').textContent = compressionStats.compressedRequests.toLocaleString();
-    document.getElementById('totalBytesSaved').textContent = compressionStats.totalBytesSavedMB || compressionStats.totalBytesSaved;
-    document.getElementById('averageCompressionRatio').textContent = compressionStats.averageCompressionRatio + '%';
-}
-
-// 测试压缩
-async function testCompression() {
-    try {
-        const testData = document.getElementById('testData').value;
-        const encoding = document.getElementById('compressionEncoding').value;
-        
-        if (!testData.trim()) {
-            showNotification('请输入测试数据', 'warning');
-            return;
-        }
-        
-        const response = await fetch('/api/compression/compress', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ data: testData, encoding })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            const resultDiv = document.getElementById('compressionTestResult');
-            const data = result.data;
-            
-            if (data.compressed) {
-                resultDiv.className = 'test-result success';
-                resultDiv.innerHTML = `
-                    <h5>✅ 压缩成功</h5>
-                    <p><strong>原始大小:</strong> ${data.originalSize} bytes</p>
-                    <p><strong>压缩后大小:</strong> ${data.compressedSize} bytes</p>
-                    <p><strong>压缩率:</strong> ${data.ratio}%</p>
-                    <p><strong>节省空间:</strong> ${data.originalSize - data.compressedSize} bytes</p>
-                `;
-            } else {
-                resultDiv.className = 'test-result';
-                resultDiv.innerHTML = `
-                    <h5>ℹ️ 无需压缩</h5>
-                    <p>数据大小 ${data.originalSize} bytes 小于压缩阈值</p>
-                `;
-            }
-        } else {
-            showNotification('测试失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('测试压缩失败:', error);
-        // 模拟压缩结果用于演示
-        const resultDiv = document.getElementById('compressionTestResult');
-        const originalSize = testData.length;
-        const compressedSize = Math.floor(originalSize * 0.6);
-        const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1);
-        
-        resultDiv.className = 'test-result success';
-        resultDiv.innerHTML = `
-            <h5>✅ 模拟压缩成功</h5>
-            <p><strong>原始大小:</strong> ${originalSize} bytes</p>
-            <p><strong>压缩后大小:</strong> ${compressedSize} bytes</p>
-            <p><strong>压缩率:</strong> ${ratio}%</p>
-            <p><strong>节省空间:</strong> ${originalSize - compressedSize} bytes</p>
-        `;
-    }
-}
-
-// 重置压缩统计
-async function resetCompressionStats() {
-    try {
-        const response = await fetch('/api/compression/reset-stats', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('统计已重置', 'success');
-            setTimeout(() => refreshCompressionStats(), 1000);
-        } else {
-            showNotification('重置失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('重置压缩统计失败:', error);
-        showNotification('统计已重置（模拟）', 'success');
-        setTimeout(() => refreshCompressionStats(), 1000);
-    }
-}
-
-// 初始化界面交互优化
-function initInterfaceOptimization() {
-    // 初始化拖拽排序
-    initDragAndDrop();
-    
-    // 初始化快捷键支持
-    initKeyboardShortcuts();
-    
-    // 初始化动画效果
-    initAnimations();
-    
-    // 初始化工具提示
-    initTooltips();
-}
-
-// 初始化拖拽排序
-function initDragAndDrop() {
-    // Webhook列表拖拽排序
-    const webhookList = document.querySelector('.webhook-list');
-    if (webhookList && typeof Sortable !== 'undefined') {
-        new Sortable(webhookList, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            onEnd: function(evt) {
-                const webhookId = evt.item.getAttribute('data-webhook-id');
-                const newIndex = evt.newIndex;
-                console.log(`Webhook ${webhookId} 移动到位置 ${newIndex}`);
-                // 这里可以添加保存排序逻辑
-            }
-        });
-    }
-}
-
-// 初始化快捷键支持
-function initKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
-        // Ctrl/Cmd + K: 显示快捷键帮助
-        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-            e.preventDefault();
-            showNotification('快捷键帮助: Ctrl+N(新建), Ctrl+S(保存), Ctrl+F(搜索), Ctrl+D(主题)', 'info');
-        }
-        
-        // Ctrl/Cmd + N: 新建Webhook
-        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-            e.preventDefault();
-            const newBtn = document.getElementById('newWebhookBtn');
-            if (newBtn) newBtn.click();
-        }
-        
-        // Ctrl/Cmd + F: 搜索
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) searchInput.focus();
-        }
-        
-        // Ctrl/Cmd + D: 切换暗色主题
-        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-            e.preventDefault();
-            const themeBtn = document.getElementById('themeToggle');
-            if (themeBtn) themeBtn.click();
-        }
-        
-        // ESC: 关闭模态框
-        if (e.key === 'Escape') {
-            const openModal = document.querySelector('.modal[style*="block"]');
-            if (openModal) {
-                const closeBtn = openModal.querySelector('.close');
-                if (closeBtn) closeBtn.click();
-            }
-        }
-    });
-}
-
-// 初始化动画效果
-function initAnimations() {
-    // 为新增的元素添加动画
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList') {
-                mutation.addedNodes.forEach(function(node) {
-                    if (node.nodeType === 1) { // Element node
-                        if (node.classList.contains('webhook-item') || 
-                            node.classList.contains('log-item')) {
-                            node.classList.add('fade-in-up');
-                        }
-                    }
-                });
-            }
-        });
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-}
-
-// 初始化工具提示
-function initTooltips() {
-    // 为带有data-tooltip属性的元素添加工具提示
-    document.addEventListener('mouseover', function(e) {
-        if (e.target.hasAttribute('data-tooltip')) {
-            e.target.classList.add('tooltip');
-        }
-    });
-}
-
-// 初始化拖拽排序
-function initDragAndDrop() {
-    // Webhook列表拖拽排序
-    const webhookList = document.querySelector('.webhook-list');
-    if (webhookList) {
-        new Sortable(webhookList, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            onEnd: function(evt) {
-                const webhookId = evt.item.getAttribute('data-webhook-id');
-                const newIndex = evt.newIndex;
-                console.log(`Webhook ${webhookId} 移动到位置 ${newIndex}`);
-                // 这里可以添加保存排序逻辑
-            }
-        });
-    }
-    
-    // 日志列表拖拽排序
-    const logList = document.querySelector('.log-list');
-    if (logList) {
-        new Sortable(logList, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            onEnd: function(evt) {
-                console.log('日志顺序已更新');
-            }
-        });
-    }
-}
-
-// 初始化快捷键支持
-function initKeyboardShortcuts() {
-    document.addEventListener('keydown', function(e) {
-        // Ctrl/Cmd + K: 显示快捷键帮助
-        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-            e.preventDefault();
-            toggleKeyboardShortcuts();
-        }
-        
-        // Ctrl/Cmd + N: 新建Webhook
-        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-            e.preventDefault();
-            document.getElementById('newWebhookBtn').click();
-        }
-        
-        // Ctrl/Cmd + S: 保存配置
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            e.preventDefault();
-            const saveBtn = document.querySelector('.btn-primary[onclick*="save"]');
-            if (saveBtn) saveBtn.click();
-        }
-        
-        // Ctrl/Cmd + F: 搜索
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            document.getElementById('searchInput').focus();
-        }
-        
-        // Ctrl/Cmd + D: 切换暗色主题
-        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-            e.preventDefault();
-            document.getElementById('themeToggle').click();
-        }
-        
-        // ESC: 关闭模态框
-        if (e.key === 'Escape') {
-            const openModal = document.querySelector('.modal[style*="block"]');
-            if (openModal) {
-                const closeBtn = openModal.querySelector('.close');
-                if (closeBtn) closeBtn.click();
-            }
-        }
-    });
-}
-
-// 初始化动画效果
-function initAnimations() {
-    // 为新增的元素添加动画
-    const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList') {
-                mutation.addedNodes.forEach(function(node) {
-                    if (node.nodeType === 1) { // Element node
-                        if (node.classList.contains('webhook-item') || 
-                            node.classList.contains('log-item')) {
-                            node.classList.add('fade-in-up');
-                        }
-                    }
-                });
-            }
-        });
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-}
-
-// 初始化工具提示
-function initTooltips() {
-    // 为带有data-tooltip属性的元素添加工具提示
-    document.addEventListener('mouseover', function(e) {
-        if (e.target.hasAttribute('data-tooltip')) {
-            e.target.classList.add('tooltip');
-        }
-    });
-}
-
-// 切换快捷键显示
-function toggleKeyboardShortcuts() {
-    const shortcuts = document.getElementById('keyboardShortcuts');
-    if (!shortcuts) {
-        createKeyboardShortcuts();
-    } else {
-        shortcuts.classList.toggle('show');
-        keyboardShortcutsVisible = shortcuts.classList.contains('show');
-    }
-}
-
-// 创建快捷键提示
-function createKeyboardShortcuts() {
-    const shortcuts = document.createElement('div');
-    shortcuts.id = 'keyboardShortcuts';
-    shortcuts.className = 'keyboard-shortcuts show';
-    shortcuts.innerHTML = `
-        <h4>⌨️ 快捷键</h4>
-        <div class="shortcut-item">
-            <span>显示快捷键</span>
-            <span class="shortcut-key">Ctrl+K</span>
-        </div>
-        <div class="shortcut-item">
-            <span>新建Webhook</span>
-            <span class="shortcut-key">Ctrl+N</span>
-        </div>
-        <div class="shortcut-item">
-            <span>保存配置</span>
-            <span class="shortcut-key">Ctrl+S</span>
-        </div>
-        <div class="shortcut-item">
-            <span>搜索</span>
-            <span class="shortcut-key">Ctrl+F</span>
-        </div>
-        <div class="shortcut-item">
-            <span>切换主题</span>
-            <span class="shortcut-key">Ctrl+D</span>
-        </div>
-        <div class="shortcut-item">
-            <span>关闭</span>
-            <span class="shortcut-key">ESC</span>
-        </div>
-    `;
-    
-    document.body.appendChild(shortcuts);
-    keyboardShortcutsVisible = true;
-    
-    // 点击外部关闭
-    document.addEventListener('click', function closeShortcuts(e) {
-        if (!shortcuts.contains(e.target)) {
-            shortcuts.classList.remove('show');
-            keyboardShortcutsVisible = false;
-            document.removeEventListener('click', closeShortcuts);
-        }
-    });
-}
-
-// 异步管理模态框
-function openAsyncManageModal() {
-    document.getElementById('asyncManageModal').style.display = 'block';
-    loadAsyncConfig();
-    refreshAsyncStats();
-}
-
-function closeAsyncManageModal() {
-    document.getElementById('asyncManageModal').style.display = 'none';
-}
-
-// 压缩管理模态框
-function openCompressionManageModal() {
-    document.getElementById('compressionManageModal').style.display = 'block';
-    loadCompressionConfig();
-    refreshCompressionStats();
-}
-
-function closeCompressionManageModal() {
-    document.getElementById('compressionManageModal').style.display = 'none';
-}
-
-// 加载异步配置
-async function loadAsyncConfig() {
-    try {
-        const response = await fetch('/api/async/config');
-        const result = await response.json();
-        
-        if (result.success) {
-            asyncConfig = result.data;
-            
-            document.getElementById('enableAsync').checked = asyncConfig.enabled;
-            document.getElementById('maxConcurrent').value = asyncConfig.maxConcurrent;
-            document.getElementById('queueSize').value = asyncConfig.queueSize;
-            document.getElementById('retryAttempts').value = asyncConfig.retryAttempts;
-            document.getElementById('retryDelay').value = asyncConfig.retryDelay;
-        }
-    } catch (error) {
-        console.error('加载异步配置失败:', error);
-        showNotification('加载配置失败', 'error');
-    }
-}
-
-// 保存异步配置
-async function saveAsyncConfig() {
-    try {
-        const config = {
-            enabled: document.getElementById('enableAsync').checked,
-            maxConcurrent: parseInt(document.getElementById('maxConcurrent').value),
-            queueSize: parseInt(document.getElementById('queueSize').value),
-            retryAttempts: parseInt(document.getElementById('retryAttempts').value),
-            retryDelay: parseInt(document.getElementById('retryDelay').value)
-        };
-        
-        const response = await fetch('/api/async/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('配置已保存', 'success');
-        } else {
-            showNotification('保存失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存异步配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
-}
-
-// 刷新异步统计
-async function refreshAsyncStats() {
-    try {
-        const response = await fetch('/api/async/status');
-        const result = await response.json();
-        
-        if (result.success) {
-            asyncStats = result.data;
-            updateAsyncStatsDisplay();
-        }
-    } catch (error) {
-        console.error('刷新异步统计失败:', error);
-        showNotification('刷新统计失败', 'error');
-    }
-}
-
-// 更新异步统计显示
-function updateAsyncStatsDisplay() {
-    if (!asyncStats) return;
-    
-    document.getElementById('queueLength').textContent = asyncStats.queueLength;
-    document.getElementById('activeWorkers').textContent = asyncStats.activeWorkers;
-    document.getElementById('totalProcessed').textContent = asyncStats.totalProcessed.toLocaleString();
-    document.getElementById('totalFailed').textContent = asyncStats.totalFailed.toLocaleString();
-}
-
-// 触发异步任务
-async function triggerAsyncTask() {
-    try {
-        const webhookId = 'test'; // 使用测试webhook ID
-        const priority = 'normal';
-        
-        const response = await fetch('/api/async/trigger', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ webhookId, priority })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('测试任务已触发', 'success');
-            setTimeout(() => refreshAsyncStats(), 1000);
-        } else {
-            showNotification('触发失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('触发异步任务失败:', error);
-        showNotification('触发失败: ' + error.message, 'error');
-    }
-}
-
-// 清空异步队列
-async function clearAsyncQueue() {
-    try {
-        const response = await fetch('/api/async/clear-queue', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('队列已清空', 'success');
-            setTimeout(() => refreshAsyncStats(), 1000);
-        } else {
-            showNotification('清空失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('清空异步队列失败:', error);
-        showNotification('清空失败: ' + error.message, 'error');
-    }
-}
-
-// 加载压缩配置
-async function loadCompressionConfig() {
-    try {
-        const response = await fetch('/api/compression/config');
-        const result = await response.json();
-        
-        if (result.success) {
-            compressionConfig = result.data;
-            
-            document.getElementById('enableCompression').checked = compressionConfig.enabled;
-            document.getElementById('compressionThreshold').value = compressionConfig.threshold;
-            document.getElementById('compressionLevel').value = compressionConfig.level;
-            document.getElementById('windowBits').value = compressionConfig.windowBits;
-            document.getElementById('memLevel').value = compressionConfig.memLevel;
-        }
-    } catch (error) {
-        console.error('加载压缩配置失败:', error);
-        showNotification('加载配置失败', 'error');
-    }
-}
-
-// 保存压缩配置
-async function saveCompressionConfig() {
-    try {
-        const config = {
-            enabled: document.getElementById('enableCompression').checked,
-            threshold: parseInt(document.getElementById('compressionThreshold').value),
-            level: parseInt(document.getElementById('compressionLevel').value),
-            windowBits: parseInt(document.getElementById('windowBits').value),
-            memLevel: parseInt(document.getElementById('memLevel').value)
-        };
-        
-        const response = await fetch('/api/compression/config', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('配置已保存', 'success');
-        } else {
-            showNotification('保存失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('保存压缩配置失败:', error);
-        showNotification('保存失败: ' + error.message, 'error');
-    }
-}
-
-// 刷新压缩统计
-async function refreshCompressionStats() {
-    try {
-        const response = await fetch('/api/compression/stats');
-        const result = await response.json();
-        
-        if (result.success) {
-            compressionStats = result.data;
-            updateCompressionStatsDisplay();
-        }
-    } catch (error) {
-        console.error('刷新压缩统计失败:', error);
-        showNotification('刷新统计失败', 'error');
-    }
-}
-
-// 更新压缩统计显示
-function updateCompressionStatsDisplay() {
-    if (!compressionStats) return;
-    
-    document.getElementById('totalRequests').textContent = compressionStats.totalRequests.toLocaleString();
-    document.getElementById('compressedRequests').textContent = compressionStats.compressedRequests.toLocaleString();
-    document.getElementById('totalBytesSaved').textContent = compressionStats.totalBytesSavedMB;
-    document.getElementById('averageCompressionRatio').textContent = compressionStats.averageCompressionRatio + '%';
-}
-
-// 测试压缩
-async function testCompression() {
-    try {
-        const testData = document.getElementById('testData').value;
-        const encoding = document.getElementById('compressionEncoding').value;
-        
-        if (!testData.trim()) {
-            showNotification('请输入测试数据', 'warning');
-            return;
-        }
-        
-        const response = await fetch('/api/compression/compress', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ data: testData, encoding })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            const resultDiv = document.getElementById('compressionTestResult');
-            const data = result.data;
-            
-            if (data.compressed) {
-                resultDiv.className = 'test-result success';
-                resultDiv.innerHTML = `
-                    <h5>✅ 压缩成功</h5>
-                    <p><strong>原始大小:</strong> ${data.originalSize} bytes</p>
-                    <p><strong>压缩后大小:</strong> ${data.compressedSize} bytes</p>
-                    <p><strong>压缩率:</strong> ${data.ratio}%</p>
-                    <p><strong>节省空间:</strong> ${data.originalSize - data.compressedSize} bytes</p>
-                `;
-            } else {
-                resultDiv.className = 'test-result';
-                resultDiv.innerHTML = `
-                    <h5>ℹ️ 无需压缩</h5>
-                    <p>数据大小 ${data.originalSize} bytes 小于压缩阈值</p>
-                `;
-            }
-        } else {
-            showNotification('测试失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('测试压缩失败:', error);
-        showNotification('测试失败: ' + error.message, 'error');
-    }
-}
-
-// 重置压缩统计
-async function resetCompressionStats() {
-    try {
-        const response = await fetch('/api/compression/reset-stats', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showNotification('统计已重置', 'success');
-            setTimeout(() => refreshCompressionStats(), 1000);
-        } else {
-            showNotification('重置失败: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('重置压缩统计失败:', error);
-        showNotification('重置失败: ' + error.message, 'error');
-    }
-}
-
-// 增强的通知系统
-function showEnhancedNotification(message, type = 'info', duration = 3000) {
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type} fade-in-up`;
-    notification.innerHTML = `
-        <div class="notification-content">
-            <span class="notification-icon">${getNotificationIcon(type)}</span>
-            <span class="notification-message">${message}</span>
-            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
-        </div>
-        <div class="notification-progress"></div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // 自动移除
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.classList.add('fade-out');
-            setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.remove();
-                }
-            }, 300);
-        }
-    }, duration);
-    
-    // 进度条动画
-    const progress = notification.querySelector('.notification-progress');
-    progress.style.width = '100%';
-}
-
-// 获取通知图标
-function getNotificationIcon(type) {
-    const icons = {
-        success: '✅',
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️'
-    };
-    return icons[type] || icons.info;
-}
-
-// 初始化数据展示优化
-function initDataDisplayOptimization() {
-    // 初始化图表库
-    initCharts();
-    
-    // 初始化数据导出
-    initDataExport();
-    
-    // 初始化实时更新
-    initRealTimeUpdates();
-}
-
-// 初始化图表库
-function initCharts() {
-    // 检查是否已加载Chart.js
-    if (typeof Chart !== 'undefined') {
-        // 设置Chart.js全局配置
-        Chart.defaults.font.family = 'Arial, sans-serif';
-        Chart.defaults.font.size = 12;
-        Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--text-primary');
-        
-        // 创建Webhook统计图表
-        createWebhookStatsChart();
-        
-        // 创建请求趋势图表
-        createRequestTrendChart();
-    }
-}
-
-// 创建Webhook统计图表
-function createWebhookStatsChart() {
-    const ctx = document.getElementById('webhookStatsChart');
-    if (!ctx) return;
-    
-    const chart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['活跃', '暂停', '错误'],
-            datasets: [{
-                data: [0, 0, 0],
-                backgroundColor: [
-                    '#4CAF50',
-                    '#FF9800',
-                    '#F44336'
-                ],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                title: {
-                    display: true,
-                    text: 'Webhook状态统计'
-                }
-            }
-        }
-    });
-    
-    // 保存图表引用
-    window.webhookStatsChart = chart;
-}
-
-// 创建请求趋势图表
-function createRequestTrendChart() {
-    const ctx = document.getElementById('requestTrendChart');
-    if (!ctx) return;
-    
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '请求数量',
-                data: [],
-                borderColor: '#2196F3',
-                backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false
-                },
-                title: {
-                    display: true,
-                    text: '请求趋势'
-                }
-            }
-        }
-    });
-    
-    // 保存图表引用
-    window.requestTrendChart = chart;
-}
-
-// 更新Webhook统计图表
-function updateWebhookStatsChart() {
-    if (!window.webhookStatsChart) return;
-    
-    const webhooks = getWebhooks();
-    const stats = {
-        active: 0,
-        paused: 0,
-        error: 0
-    };
-    
-    webhooks.forEach(webhook => {
-        if (webhook.state === 1) {
-            stats.active++;
-        } else if (webhook.state === 0) {
-            stats.paused++;
-        } else {
-            stats.error++;
-        }
-    });
-    
-    window.webhookStatsChart.data.datasets[0].data = [stats.active, stats.paused, stats.error];
-    window.webhookStatsChart.update();
-}
-
-// 更新请求趋势图表
-function updateRequestTrendChart() {
-    if (!window.requestTrendChart) return;
-    
-    const now = new Date();
-    const labels = [];
-    const data = [];
-    
-    // 生成最近24小时的时间标签
-    for (let i = 23; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-        labels.push(time.getHours() + ':00');
-        
-        // 这里应该从实际数据中获取，暂时使用随机数据
-        data.push(Math.floor(Math.random() * 10));
-    }
-    
-    window.requestTrendChart.data.labels = labels;
-    window.requestTrendChart.data.datasets[0].data = data;
-    window.requestTrendChart.update();
-}
-
-// 初始化数据导出
-function initDataExport() {
-    // 添加导出按钮事件监听
-    const exportBtn = document.getElementById('exportBtn');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', exportData);
-    }
-}
-
-// 导出数据
-function exportData() {
-    const webhooks = getWebhooks();
-    const logs = getLogs();
-    
-    const exportData = {
-        webhooks: webhooks,
-        logs: logs,
-        exportTime: new Date().toISOString(),
-        version: '1.0.0'
-    };
-    
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(dataBlob);
-    link.download = `webhook-data-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    
-    showNotification('数据导出成功', 'success');
-}
-
-// 初始化实时更新
-function initRealTimeUpdates() {
-    // 设置定时器，定期更新图表
-    setInterval(() => {
-        updateWebhookStatsChart();
-        updateRequestTrendChart();
-    }, 30000); // 30秒更新一次
-    
-    // 监听Webhook和日志变化
-    const observer = new MutationObserver(() => {
-        updateWebhookStatsChart();
-    });
-    
-    const webhookList = document.querySelector('.webhook-list');
-    if (webhookList) {
-        observer.observe(webhookList, {
-            childList: true,
-            subtree: true
-        });
-    }
-}
-
-// 初始化搜索过滤优化
-function initSearchFilterOptimization() {
-    // 初始化搜索建议
-    initSearchSuggestions();
-    
-    // 初始化搜索历史
-    initSearchHistory();
-    
-    // 初始化智能过滤
-    initSmartFiltering();
-}
-
-// 初始化搜索建议
-function initSearchSuggestions() {
-    const searchInput = document.getElementById('searchInput');
-    if (!searchInput) return;
-    
-    // 创建搜索建议容器
-    const suggestionsContainer = document.createElement('div');
-    suggestionsContainer.id = 'searchSuggestions';
-    suggestionsContainer.className = 'search-suggestions';
-    searchInput.parentNode.appendChild(suggestionsContainer);
-    
-    // 监听输入事件
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim();
-        if (query.length > 0) {
-            showSearchSuggestions(query);
-        } else {
-            hideSearchSuggestions();
-        }
-    });
-    
-    // 监听焦点事件
-    searchInput.addEventListener('focus', function() {
-        if (this.value.trim().length > 0) {
-            showSearchSuggestions(this.value.trim());
-        }
-    });
-    
-    // 监听失焦事件
-    searchInput.addEventListener('blur', function() {
-        setTimeout(hideSearchSuggestions, 200);
-    });
-}
-
-// 显示搜索建议
-function showSearchSuggestions(query) {
-    const suggestionsContainer = document.getElementById('searchSuggestions');
-    if (!suggestionsContainer) return;
-    
-    const suggestions = generateSearchSuggestions(query);
-    if (suggestions.length === 0) {
-        hideSearchSuggestions();
-        return;
-    }
-    
-    suggestionsContainer.innerHTML = suggestions.map(suggestion => `
-        <div class="suggestion-item" onclick="selectSearchSuggestion('${suggestion}')">
-            <span class="suggestion-icon">🔍</span>
-            <span class="suggestion-text">${suggestion}</span>
-        </div>
-    `).join('');
-    
-    suggestionsContainer.style.display = 'block';
-}
-
-// 隐藏搜索建议
-function hideSearchSuggestions() {
-    const suggestionsContainer = document.getElementById('searchSuggestions');
-    if (suggestionsContainer) {
-        suggestionsContainer.style.display = 'none';
-    }
-}
-
-// 生成搜索建议
-function generateSearchSuggestions(query) {
-    const suggestions = [];
-    const webhooks = getWebhooks();
-    const logs = getLogs();
-    
-    // 基于Webhook名称的建议
-    webhooks.forEach(webhook => {
-        if (webhook.name.toLowerCase().includes(query.toLowerCase())) {
-            suggestions.push(`Webhook: ${webhook.name}`);
-        }
-    });
-    
-    // 基于日志内容的建议
-    const uniqueLogs = [...new Set(logs.map(log => log.method))];
-    uniqueLogs.forEach(method => {
-        if (method.toLowerCase().includes(query.toLowerCase())) {
-            suggestions.push(`Method: ${method}`);
-        }
-    });
-    
-    // 基于状态码的建议
-    const uniqueStatusCodes = [...new Set(logs.map(log => log.statusCode))];
-    uniqueStatusCodes.forEach(statusCode => {
-        if (statusCode.toString().includes(query)) {
-            suggestions.push(`Status: ${statusCode}`);
-        }
-    });
-    
-    return suggestions.slice(0, 5); // 最多显示5个建议
-}
-
-// 选择搜索建议
-function selectSearchSuggestion(suggestion) {
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        // 提取搜索关键词
-        const colonIndex = suggestion.indexOf(':');
-        if (colonIndex > -1) {
-            searchInput.value = suggestion.substring(colonIndex + 1).trim();
-        } else {
-            searchInput.value = suggestion;
-        }
-        
-        // 触发搜索
-        searchInput.dispatchEvent(new Event('input'));
-        hideSearchSuggestions();
-    }
-}
-
-// 初始化搜索历史
-function initSearchHistory() {
-    // 从本地存储加载搜索历史
-    const savedHistory = localStorage.getItem('webhookSearchHistory');
-    if (savedHistory) {
-        try {
-            searchHistory = JSON.parse(savedHistory);
-        } catch (error) {
-            console.error('解析搜索历史失败:', error);
-            searchHistory = [];
-        }
-    }
-    
-    // 创建搜索历史按钮
-    const searchContainer = document.querySelector('.search-container');
-    if (searchContainer) {
-        const historyBtn = document.createElement('button');
-        historyBtn.id = 'searchHistoryBtn';
-        historyBtn.className = 'btn btn-secondary';
-        historyBtn.innerHTML = '📚 搜索历史';
-        historyBtn.onclick = showSearchHistory;
-        searchContainer.appendChild(historyBtn);
-    }
-}
-
-// 显示搜索历史
-function showSearchHistory() {
-    if (searchHistory.length === 0) {
-        showNotification('暂无搜索历史', 'info');
-        return;
-    }
-    
-    const historyHtml = searchHistory.map((item, index) => `
-        <div class="history-item">
-            <div class="history-info">
-                <span class="history-name">${item.name}</span>
-                <span class="history-time">${new Date(item.timestamp).toLocaleString()}</span>
-            </div>
-            <div class="history-actions">
-                <button class="btn btn-sm btn-primary" onclick="applySearchHistory(${index})">应用</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteSearchHistory(${index})">删除</button>
-            </div>
-        </div>
-    `).join('');
-    
-    // 显示历史记录
+// 智能过滤功能
+function showSmartFilter() {
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.style.display = 'block';
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h3>📚 搜索历史</h3>
-                <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="search-history-list">
-                    ${historyHtml}
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="this.parentElement.parentElement.remove()">关闭</button>
-                <button class="btn btn-danger" onclick="clearSearchHistory()">清空历史</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-}
-
-// 应用搜索历史
-function applySearchHistory(index) {
-    const historyItem = searchHistory[index];
-    if (historyItem) {
-        // 应用搜索条件
-        if (historyItem.conditions) {
-            advancedSearchConditions = [...historyItem.conditions];
-            renderSearchConditions();
-        }
-        
-        // 应用搜索逻辑
-        if (historyItem.logic) {
-            document.getElementById('conditionLogic').value = historyItem.logic;
-        }
-        
-        // 关闭模态框
-        document.querySelector('.modal').remove();
-        
-        showNotification('搜索历史已应用', 'success');
-    }
-}
-
-// 删除搜索历史
-function deleteSearchHistory(index) {
-    searchHistory.splice(index, 1);
-    localStorage.setItem('webhookSearchHistory', JSON.stringify(searchHistory));
-    showSearchHistory(); // 刷新显示
-}
-
-// 清空搜索历史
-function clearSearchHistory() {
-    searchHistory = [];
-    localStorage.removeItem('webhookSearchHistory');
-    document.querySelector('.modal').remove();
-    showNotification('搜索历史已清空', 'success');
-}
-
-// 初始化智能过滤
-function initSmartFiltering() {
-    // 创建智能过滤按钮
-    const filterContainer = document.querySelector('.filter-container');
-    if (filterContainer) {
-        const smartFilterBtn = document.createElement('button');
-        smartFilterBtn.id = 'smartFilterBtn';
-        smartFilterBtn.className = 'btn btn-secondary';
-        smartFilterBtn.innerHTML = '🧠 智能过滤';
-        smartFilterBtn.onclick = showSmartFilters;
-        filterContainer.appendChild(smartFilterBtn);
-    }
-}
-
-// 显示智能过滤选项
-function showSmartFilters() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'block';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>🧠 智能过滤</h3>
-                <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                <h3>智能过滤</h3>
+                <button class="modal-close" onclick="this.parentElement.parentElement.parentElement.remove()">×</button>
             </div>
             <div class="modal-body">
                 <div class="smart-filter-options">
-                    <div class="filter-option">
-                        <h4>📊 状态过滤</h4>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('status', 'success')">成功请求</button>
-                        <button class="btn btn-sm btn-warning" onclick="applySmartFilter('status', 'error')">错误请求</button>
-                        <button class="btn btn-sm btn-info" onclick="applySmartFilter('status', 'pending')">待处理</button>
+                    <div class="filter-category">
+                        <h4>按状态过滤</h4>
+                        <div class="filter-buttons">
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('status', 'success')">成功请求</button>
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('status', 'error')">错误请求</button>
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('status', 'pending')">待处理</button>
+                        </div>
                     </div>
-                    <div class="filter-option">
-                        <h4>⏰ 时间过滤</h4>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('time', 'today')">今天</button>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('time', 'week')">本周</button>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('time', 'month')">本月</button>
+                    
+                    <div class="filter-category">
+                        <h4>按时间过滤</h4>
+                        <div class="filter-buttons">
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('time', 'today')">今天</button>
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('time', 'week')">本周</button>
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('time', 'month')">本月</button>
+                        </div>
                     </div>
-                    <div class="filter-option">
-                        <h4>🔍 内容过滤</h4>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('content', 'large')">大文件请求</button>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('content', 'json')">JSON请求</button>
-                        <button class="btn btn-sm btn-primary" onclick="applySmartFilter('content', 'form')">表单请求</button>
+                    
+                    <div class="filter-category">
+                        <h4>按内容过滤</h4>
+                        <div class="filter-buttons">
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('content', 'large')">大文件</button>
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('content', 'json')">JSON数据</button>
+                            <button class="ant-btn ant-btn-sm" onclick="applySmartFilter('content', 'form')">表单数据</button>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="this.parentElement.parentElement.remove()">关闭</button>
+                <button class="ant-btn ant-btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()">关闭</button>
             </div>
         </div>
     `;

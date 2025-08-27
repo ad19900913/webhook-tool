@@ -4,767 +4,558 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Webhook回调工具</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.15.1/dist/reset.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.15.1/dist/antd.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🔗 Webhook回调工具</h1>
-            <div class="header-right">
-            <div class="header-actions">
-                <button id="batchModeBtn" class="btn btn-secondary">📋 批量操作</button>
-                <button id="exportBtn" class="btn btn-secondary">📊 导出Excel</button>
-                <button id="showStatsBtn" class="btn btn-primary">📊 统计图表</button>
-                <button id="dataCleanupBtn" class="btn btn-secondary">🧹 数据清理</button>
-                <button id="memoryOptimizeBtn" class="btn btn-secondary">💾 内存优化</button>
-                <button id="asyncManageBtn" class="btn btn-secondary">⚡ 异步管理</button>
-                <button id="compressionManageBtn" class="btn btn-secondary">📦 压缩管理</button>
-                <button id="themeToggle" class="btn btn-secondary">🌙 暗色主题</button>
-                <button id="securityConfigBtn" class="btn btn-secondary">🔒 安全配置</button>
-                <button id="systemMonitorBtn" class="btn btn-secondary">🖥️ 系统监控</button>
-            </div>
-                <div class="system-status" id="systemStatus">
-                    <div class="memory-info">
-                        <span class="memory-label">内存使用:</span>
-                        <span class="memory-value" id="memoryValue">-- MB</span>
-                        <span class="memory-warning" id="memoryWarning" style="display: none;">⚠️ 内存不足</span>
+    <div id="app">
+        <!-- Ant Design 应用容器 -->
+        <div class="ant-app">
+            <!-- 顶部导航栏 -->
+            <header class="ant-layout-header">
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1 class="header-title">
+                            <span class="header-icon">🔗</span>
+                            Webhook回调工具
+                        </h1>
                     </div>
-                    <div class="system-actions">
-                        <button id="clearAllLogsBtn" class="btn btn-small btn-warning" style="display: none;">清理所有日志</button>
+                    <div class="header-right">
+                        <button class="ant-btn ant-btn-default" id="exportBtn">
+                            <span class="anticon">📊</span>
+                            导出Excel
+                        </button>
+                        <button class="ant-btn ant-btn-primary" id="showStatsBtn">
+                            <span class="anticon">📊</span>
+                            统计图表
+                        </button>
                     </div>
                 </div>
-            </div>
-        </header>
+            </header>
 
-        <main class="main-layout">
-            <!-- 统计图表区域 -->
-            <section class="stats-section" id="statsSection" style="display: none;">
-                <div class="stats-header">
-                    <h2>实时统计与告警</h2>
-                    <div class="stats-controls">
-                        <button id="closeStatsBtn" class="btn btn-small btn-secondary">关闭</button>
-                    </div>
-                </div>
-                <div class="stats-content">
-                    <div class="stats-card">
-                        <h3>请求成功率</h3>
-                        <div class="chart-container">
-                            <canvas id="successRateChart"></canvas>
+            <!-- 主要内容区域 -->
+            <main class="ant-layout-content">
+                <!-- 统计图表区域 -->
+                <section class="stats-section" id="statsSection" style="display: none;">
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-wrapper">
+                                <div class="ant-card-head-title">实时统计与告警</div>
+                                <div class="ant-card-extra">
+                                    <button class="ant-btn ant-btn-sm ant-btn-default" id="closeStatsBtn">关闭</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ant-card-body">
+                            <div class="stats-grid">
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">请求成功率</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="successRateChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">响应时间统计</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="responseTimeChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">请求趋势图</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="requestTrendChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">来源分析 - IP地址</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="ipSourceChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">来源分析 - User-Agent</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="userAgentChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">响应时间分布</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="responseTimeDistChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">性能监控</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="performanceChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">错误类型统计</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="errorTypeChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">错误趋势分析</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="chart-container">
+                                            <canvas id="errorTrendChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ant-card alerts-card">
+                                    <div class="ant-card-head">
+                                        <div class="ant-card-head-title">告警信息</div>
+                                    </div>
+                                    <div class="ant-card-body">
+                                        <div class="alerts-container" id="alertsContainer">
+                                            <div class="no-alerts">暂无告警信息</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="stats-card">
-                        <h3>响应时间统计</h3>
-                        <div class="chart-container">
-                            <canvas id="responseTimeChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>请求趋势图</h3>
-                        <div class="chart-container">
-                            <canvas id="requestTrendChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>来源分析 - IP地址</h3>
-                        <div class="chart-container">
-                            <canvas id="ipSourceChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>来源分析 - User-Agent</h3>
-                        <div class="chart-container">
-                            <canvas id="userAgentChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>响应时间分布</h3>
-                        <div class="chart-container">
-                            <canvas id="responseTimeDistChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>性能监控</h3>
-                        <div class="chart-container">
-                            <canvas id="performanceChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>错误类型统计</h3>
-                        <div class="chart-container">
-                            <canvas id="errorTypeChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card">
-                        <h3>错误趋势分析</h3>
-                        <div class="chart-container">
-                            <canvas id="errorTrendChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="stats-card alerts-card">
-                        <h3>告警信息</h3>
-                        <div class="alerts-container" id="alertsContainer">
-                            <div class="no-alerts">暂无告警信息</div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-            
-            <!-- 左侧Webhook列表 -->
-            <aside class="sidebar">
-                <div class="sidebar-header">
-                    <h2>Webhook列表</h2>
-                    <div class="batch-actions" id="batchActions" style="display: none;">
-                        <button id="selectAllBtn" class="btn btn-small btn-secondary">全选</button>
-                        <button id="batchEnableBtn" class="btn btn-small btn-success">启用</button>
-                        <button id="batchDisableBtn" class="btn btn-small btn-warning">禁用</button>
-                        <button id="batchDeleteBtn" class="btn btn-small btn-danger">删除</button>
-                        <button id="exitBatchBtn" class="btn btn-small btn-secondary">退出</button>
-                    </div>
-                    <button id="createBtn2" class="btn btn-small btn-primary">新建</button>
-                </div>
-                <div class="sidebar-search">
-                    <input type="text" id="webhookSearch" placeholder="搜索Webhook名称..." class="search-input">
-                    <button id="clearWebhookSearchBtn" class="btn btn-small btn-secondary" style="display: none;">清空</button>
-                </div>
-                <div class="sidebar-content">
-                    <div id="webhookContainer">
-                        <!-- Webhook项目将在这里动态生成 -->
-                    </div>
-                </div>
-            </aside>
+                </section>
 
-            <!-- 右侧日志展示区域 -->
-            <section class="content-area">
-                <div class="logs-section">
-                    <div class="logs-header">
-                        <h2>实时日志</h2>
-                        <div class="logs-controls">
-                            <select id="webhookFilter">
-                                <option value="">选择Webhook查看日志</option>
-                            </select>
-                            <select id="messageTypeFilter">
-                                <option value="all">所有类型</option>
-                            </select>
-                            <div class="search-controls">
-                                <input type="text" id="tenantIdSearch" placeholder="搜索 tenantId">
-                                <input type="text" id="uniqueIdSearch" placeholder="搜索 uniqueId">
-                                <button id="clearSearchBtn" class="btn btn-small btn-secondary">清空搜索</button>
-                                <button id="advancedSearchBtn" class="btn btn-small btn-info">🔍 高级搜索</button>
-                                <button id="quickFilterBtn" class="btn btn-small btn-success">⚡ 快速过滤</button>
+                <!-- 主要内容布局 -->
+                <div class="main-layout">
+                    <!-- 左侧Webhook列表 -->
+                    <aside class="ant-layout-sider">
+                        <div class="ant-card">
+                            <div class="ant-card-head">
+                                <div class="ant-card-head-wrapper">
+                                    <div class="ant-card-head-title">Webhook列表</div>
+                                    <div class="ant-card-extra">
+                                        <button class="ant-btn ant-btn-sm ant-btn-primary" id="createBtn2">新建</button>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="time-range-controls">
-                                <input type="datetime-local" id="startTimeFilter" placeholder="开始时间">
-                                <span>至</span>
-                                <input type="datetime-local" id="endTimeFilter" placeholder="结束时间">
-                                <button id="applyTimeFilterBtn" class="btn btn-small btn-primary">应用</button>
-                                <button id="clearTimeFilterBtn" class="btn btn-small btn-secondary">清除</button>
-                            </div>
-                            <div class="type-stats" id="typeStats"></div>
-                            <div class="log-limit-notice">
-                                <small>📝 每种消息类型最多保留1000条日志</small>
-                            </div>
-                            <div class="logs-actions">
-                                <button id="exportLogsBtn" class="btn btn-primary">导出Excel</button>
-                                <button id="clearLogsBtn" class="btn btn-secondary">清空日志</button>
-                                <button id="clearAdvancedSearchBtn" class="btn btn-warning" style="display: none;">清除高级搜索</button>
-                                <button id="clearQuickFilterBtn" class="btn btn-warning" style="display: none;">清除快速过滤</button>
+                            <div class="ant-card-body">
+                                <div class="search-container">
+                                    <div class="ant-input-affix-wrapper">
+                                        <span class="ant-input-prefix">
+                                            <span class="anticon">🔍</span>
+                                        </span>
+                                        <input type="text" class="ant-input" id="webhookSearch" placeholder="搜索Webhook名称...">
+                                        <span class="ant-input-suffix" id="clearWebhookSearchBtn" style="display: none;">
+                                            <span class="anticon" style="cursor: pointer;">✕</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="webhook-list" id="webhookContainer">
+                                    <!-- Webhook项目将在这里动态生成 -->
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div id="logsContainer" class="logs-container">
-                        <div class="no-logs">请在左侧选择一个Webhook查看日志</div>
-                    </div>
+                    </aside>
+
+                    <!-- 右侧日志展示区域 -->
+                    <section class="ant-layout-content">
+                        <div class="ant-card">
+                            <div class="ant-card-head">
+                                <div class="ant-card-head-wrapper">
+                                    <div class="ant-card-head-title">
+                                        <span class="main-title">实时日志</span>
+                                        <span class="log-limit-notice">📝 每种消息类型最多保留1000条日志</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ant-card-body">
+                                <div class="logs-controls-modern">
+                                    <!-- 第一行：主要筛选条件 -->
+                                    <div class="filter-row primary-filters">
+                                        <div class="filter-group">
+                                            <label class="filter-label">Webhook</label>
+                                            <select class="ant-select modern-select" id="webhookFilter">
+                                                <option value="">选择Webhook查看日志</option>
+                                            </select>
+                                        </div>
+                                        <div class="filter-group">
+                                            <label class="filter-label">消息类型</label>
+                                            <select class="ant-select modern-select" id="messageTypeFilter">
+                                                <option value="all">所有类型</option>
+                                            </select>
+                                        </div>
+                                        <div class="filter-group search-group">
+                                            <label class="filter-label">搜索条件</label>
+                                            <div class="search-inputs-row">
+                                                <input type="text" class="ant-input modern-input" id="tenantIdSearch" placeholder="Tenant ID">
+                                                <input type="text" class="ant-input modern-input" id="uniqueIdSearch" placeholder="Unique ID">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 第二行：时间筛选和操作按钮 -->
+                                    <div class="filter-row secondary-filters">
+                                        <div class="filter-group time-group">
+                                            <label class="filter-label">时间范围</label>
+                                            <div class="time-range-inputs">
+                                                <input type="datetime-local" class="ant-input modern-input time-input-compact" id="startTimeFilter">
+                                                <span class="time-separator">—</span>
+                                                <input type="datetime-local" class="ant-input modern-input time-input-compact" id="endTimeFilter">
+                                                <button class="ant-btn ant-btn-primary modern-btn" id="applyTimeFilterBtn">应用</button>
+                                                <button class="ant-btn ant-btn-ghost modern-btn" id="clearTimeFilterBtn">清除</button>
+                                            </div>
+                                        </div>
+                                        <div class="filter-group actions-group">
+                                            <div class="action-buttons">
+                                                <button class="ant-btn ant-btn-primary modern-btn" id="exportLogsBtn">
+                                                    <span class="anticon">📊</span>
+                                                    导出Excel
+                                                </button>
+                                                <button class="ant-btn ant-btn-ghost modern-btn" id="clearLogsBtn">
+                                                    <span class="anticon">🗑️</span>
+                                                    清空日志
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 统计信息 -->
+                                    <div class="type-stats" id="typeStats"></div>
+                                </div>
+                                
+                                <div class="logs-container" id="logsContainer">
+                                    <div class="no-logs">请在左侧选择一个Webhook查看日志</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-            </section>
-        </main>
+            </main>
+        </div>
     </div>
 
     <!-- 创建/编辑Webhook模态框 -->
-    <div id="webhookModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">创建Webhook</h3>
-                <span class="close">&times;</span>
+    <div id="webhookModal" class="ant-modal" style="display: none;">
+        <div class="ant-modal-content">
+            <div class="ant-modal-header">
+                <div class="ant-modal-title" id="modalTitle">创建Webhook</div>
+                <button class="ant-modal-close" onclick="closeWebhookModal()">
+                    <span class="anticon">✕</span>
+                </button>
             </div>
-            <form id="webhookForm">
-                <div class="form-content">
-                    <div class="form-group">
-                        <label for="webhookName">名称:</label>
-                        <input type="text" id="webhookName" required>
+            <div class="ant-modal-body">
+                <form id="webhookForm">
+                    <div class="ant-form-item">
+                        <label class="ant-form-item-label">名称:</label>
+                        <div class="ant-form-item-control">
+                            <input type="text" class="ant-input" id="webhookName" required>
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="pathType">路径类型:</label>
-                        <select id="pathType">
-                            <option value="auto">自动生成</option>
-                            <option value="custom">自定义路径</option>
-                        </select>
+                    <div class="ant-form-item">
+                        <label class="ant-form-item-label">路径类型:</label>
+                        <div class="ant-form-item-control">
+                            <select class="ant-select" id="pathType">
+                                <option value="auto">自动生成</option>
+                                <option value="custom">自定义路径</option>
+                            </select>
+                        </div>
                     </div>
                     
-                    <div class="form-group" id="customPathGroup" style="display: none;">
-                        <label for="customPath">自定义路径:</label>
-                        <input type="text" id="customPath" placeholder="例如: my-webhook">
-                        <small>完整地址将是: /webhook/your-path</small>
+                    <div class="ant-form-item" id="customPathGroup" style="display: none;">
+                        <label class="ant-form-item-label">自定义路径:</label>
+                        <div class="ant-form-item-control">
+                            <input type="text" class="ant-input" id="customPath" placeholder="例如: my-webhook">
+                            <div class="ant-form-item-explain">完整地址将是: /webhook/your-path</div>
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="webhookDescription">描述:</label>
-                        <textarea id="webhookDescription" rows="3"></textarea>
+                    <div class="ant-form-item">
+                        <label class="ant-form-item-label">描述:</label>
+                        <div class="ant-form-item-control">
+                            <textarea class="ant-input" id="webhookDescription" rows="3"></textarea>
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="delayType">延时类型:</label>
-                        <select id="delayType">
-                            <option value="none">无延时</option>
-                            <option value="fixed">固定延时</option>
-                            <option value="random">随机延时</option>
-                        </select>
+                    <div class="ant-form-item">
+                        <label class="ant-form-item-label">延时类型:</label>
+                        <div class="ant-form-item-control">
+                            <select class="ant-select" id="delayType">
+                                <option value="none">无延时</option>
+                                <option value="fixed">固定延时</option>
+                                <option value="random">随机延时</option>
+                            </select>
+                        </div>
                     </div>
                     
-                    <div class="form-group" id="fixedDelayGroup" style="display: none;">
-                        <label for="delayValue">延时时间(毫秒):</label>
-                        <input type="number" id="delayValue" min="1" max="100000" step="1" value="1000">
-                        <small>请输入1-100000之间的正整数</small>
+                    <div class="ant-form-item" id="fixedDelayGroup" style="display: none;">
+                        <label class="ant-form-item-label">延时时间(毫秒):</label>
+                        <div class="ant-form-item-control">
+                            <input type="number" class="ant-input" id="delayValue" min="1" max="100000" step="1" value="1000">
+                            <div class="ant-form-item-explain">请输入1-100000之间的正整数</div>
+                        </div>
                     </div>
                     
-                    <div class="form-group" id="randomDelayGroup" style="display: none;">
-                        <label for="delayMin">最小延时(毫秒):</label>
-                        <input type="number" id="delayMin" min="1" max="100000" step="1" value="1000">
-                        <label for="delayMax">最大延时(毫秒):</label>
-                        <input type="number" id="delayMax" min="1" max="100000" step="1" value="5000">
-                        <small>请输入1-100000之间的正整数</small>
+                    <div class="ant-form-item" id="randomDelayGroup" style="display: none;">
+                        <div class="delay-range">
+                            <div class="ant-form-item">
+                                <label class="ant-form-item-label">最小延时(毫秒):</label>
+                                <div class="ant-form-item-control">
+                                    <input type="number" class="ant-input" id="delayMin" min="1" max="100000" step="1" value="1000">
+                                </div>
+                            </div>
+                            <div class="ant-form-item">
+                                <label class="ant-form-item-label">最大延时(毫秒):</label>
+                                <div class="ant-form-item-control">
+                                    <input type="number" class="ant-input" id="delayMax" min="1" max="100000" step="1" value="5000">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ant-form-item-explain">请输入1-100000之间的正整数</div>
                     </div>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">取消</button>
-                    <button type="submit" class="btn btn-primary">保存</button>
-                </div>
-            </form>
+                </form>
+            </div>
+            <div class="ant-modal-footer">
+                <button class="ant-btn ant-btn-default" id="cancelBtn">取消</button>
+                <button class="ant-btn ant-btn-primary" type="submit" form="webhookForm">保存</button>
+            </div>
         </div>
     </div>
 
     <!-- 日志详情模态框 -->
-    <div id="logModal" class="modal">
-        <div class="modal-content log-modal-content">
-            <div class="modal-header">
-                <h3>请求详情</h3>
-                <span class="close">&times;</span>
+    <div id="logModal" class="ant-modal" style="display: none;">
+        <div class="ant-modal-content log-modal-content">
+            <div class="ant-modal-header">
+                <div class="ant-modal-title">请求详情</div>
+                <button class="ant-modal-close" onclick="closeLogModal()">
+                    <span class="anticon">✕</span>
+                </button>
             </div>
-            <div class="log-details">
-                <div class="log-section">
-                    <h4>基本信息</h4>
-                    <div id="logBasicInfo"></div>
-                </div>
-                <div class="log-section">
-                    <h4>请求头</h4>
-                    <pre id="logHeaders"></pre>
-                </div>
-                <div class="log-section">
-                    <h4>请求体</h4>
-                    <pre id="logBody"></pre>
+            <div class="ant-modal-body">
+                <div class="log-details">
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-title">基本信息</div>
+                        </div>
+                        <div class="ant-card-body">
+                            <div id="logBasicInfo"></div>
+                        </div>
+                    </div>
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-title">请求头</div>
+                        </div>
+                        <div class="ant-card-body">
+                            <pre id="logHeaders"></pre>
+                        </div>
+                    </div>
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-title">请求体</div>
+                        </div>
+                        <div class="ant-card-body">
+                            <pre id="logBody"></pre>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- 仪表板配置模态框 -->
-    <div id="dashboardConfigModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>仪表板配置</h3>
-                <span class="close">&times;</span>
+    <div id="dashboardConfigModal" class="ant-modal" style="display: none;">
+        <div class="ant-modal-content">
+            <div class="ant-modal-header">
+                <div class="ant-modal-title">仪表板配置</div>
+                <button class="ant-modal-close" onclick="closeDashboardConfigModal()">
+                    <span class="anticon">✕</span>
+                </button>
             </div>
-            <div class="modal-body">
+            <div class="ant-modal-body">
                 <div class="dashboard-config">
-                    <div class="config-section">
-                        <h4>图表显示配置</h4>
-                        <div class="config-grid">
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showSuccessRate" checked>
-                                    显示成功率图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showResponseTime" checked>
-                                    显示响应时间图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showRequestTrend" checked>
-                                    显示请求趋势图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showIpSource" checked>
-                                    显示IP来源图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showUserAgent" checked>
-                                    显示User-Agent图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showResponseTimeDist" checked>
-                                    显示响应时间分布图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showPerformance" checked>
-                                    显示性能监控图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showErrorType" checked>
-                                    显示错误类型图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showErrorTrend" checked>
-                                    显示错误趋势图表
-                                </label>
-                            </div>
-                            <div class="config-item">
-                                <label>
-                                    <input type="checkbox" id="showAlerts" checked>
-                                    显示告警信息
-                                </label>
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-title">图表显示配置</div>
+                        </div>
+                        <div class="ant-card-body">
+                            <div class="config-grid">
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showSuccessRate" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示成功率图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showResponseTime" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示响应时间图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showRequestTrend" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示请求趋势图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showIpSource" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示IP来源图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showUserAgent" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示User-Agent图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showResponseTimeDist" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示响应时间分布图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showPerformance" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示性能监控图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showErrorType" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示错误类型图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showErrorTrend" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示错误趋势图表</span>
+                                    </label>
+                                </div>
+                                <div class="config-item">
+                                    <label class="ant-checkbox-wrapper">
+                                        <span class="ant-checkbox">
+                                            <input type="checkbox" class="ant-checkbox-input" id="showAlerts" checked>
+                                            <span class="ant-checkbox-inner"></span>
+                                        </span>
+                                        <span>显示告警信息</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="config-section">
-                        <h4>布局配置</h4>
-                        <div class="form-group">
-                            <label for="dashboardLayout">布局方式：</label>
-                            <select id="dashboardLayout">
-                                <option value="grid">网格布局</option>
-                                <option value="list">列表布局</option>
-                                <option value="compact">紧凑布局</option>
-                            </select>
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-title">布局配置</div>
                         </div>
-                        <div class="form-group">
-                            <label for="columnsCount">每行显示列数：</label>
-                            <select id="columnsCount">
-                                <option value="1">1列</option>
-                                <option value="2" selected>2列</option>
-                                <option value="3">3列</option>
-                                <option value="4">4列</option>
-                            </select>
+                        <div class="ant-card-body">
+                            <div class="ant-form-item">
+                                <label class="ant-form-item-label">布局方式：</label>
+                                <div class="ant-form-item-control">
+                                    <select class="ant-select" id="dashboardLayout">
+                                        <option value="grid">网格布局</option>
+                                        <option value="list">列表布局</option>
+                                        <option value="compact">紧凑布局</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="ant-form-item">
+                                <label class="ant-form-item-label">每行显示列数：</label>
+                                <div class="ant-form-item-control">
+                                    <select class="ant-select" id="columnsCount">
+                                        <option value="1">1列</option>
+                                        <option value="2" selected>2列</option>
+                                        <option value="3">3列</option>
+                                        <option value="4">4列</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="config-section">
-                        <h4>数据刷新配置</h4>
-                        <div class="form-group">
-                            <label for="refreshInterval">自动刷新间隔：</label>
-                            <select id="refreshInterval">
-                                <option value="0">不自动刷新</option>
-                                <option value="5000">5秒</option>
-                                <option value="10000" selected>10秒</option>
-                                <option value="30000">30秒</option>
-                                <option value="60000">1分钟</option>
-                            </select>
+                    <div class="ant-card">
+                        <div class="ant-card-head">
+                            <div class="ant-card-head-title">数据刷新配置</div>
                         </div>
-                    </div>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" id="resetDashboardConfig">重置默认</button>
-                <button type="button" class="btn btn-primary" id="saveDashboardConfig">保存配置</button>
-                <button type="button" class="btn btn-secondary" id="cancelDashboardConfig">取消</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 数据清理管理模态框 -->
-    <div id="dataCleanupModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>🧹 数据清理管理</h3>
-                <span class="close" onclick="closeDataCleanupModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="cleanup-overview">
-                    <h4>📊 数据概览</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-label">总日志数:</span>
-                            <span class="stat-value" id="totalLogsCount">--</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">总告警数:</span>
-                            <span class="stat-value" id="totalAlertsCount">--</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Webhook数量:</span>
-                            <span class="stat-value" id="webhookCount">--</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">内存使用:</span>
-                            <span class="stat-value" id="memoryUsage">--</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="cleanup-config">
-                    <h4>⚙️ 清理配置</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableCleanup" checked> 启用自动清理
-                        </label>
-                        <small>定期自动清理过期数据</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="cleanupInterval">清理间隔（分钟）:</label>
-                            <input type="number" id="cleanupInterval" value="5" min="1" max="60">
-                        </div>
-                        <div class="form-group">
-                            <label for="maxLogsPerWebhook">每个Webhook最大日志数:</label>
-                            <input type="number" id="maxLogsPerWebhook" value="1000" min="100" max="10000">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="maxLogAge">日志保留时间（小时）:</label>
-                            <input type="number" id="maxLogAge" value="24" min="1" max="168">
-                        </div>
-                        <div class="form-group">
-                            <label for="cleanupThreshold">清理阈值:</label>
-                            <input type="number" id="cleanupThreshold" value="0.8" min="0.1" max="1" step="0.1">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="cleanup-actions">
-                    <h4>🔄 清理操作</h4>
-                    <div class="action-buttons">
-                        <button id="triggerCleanupBtn" class="btn btn-primary">🚀 触发清理</button>
-                        <button id="clearAllDataBtn" class="btn btn-danger">🗑️ 清理所有数据</button>
-                        <button id="refreshStatsBtn" class="btn btn-secondary">🔄 刷新统计</button>
-                    </div>
-                </div>
-
-                <div class="cleanup-history">
-                    <h4>📝 清理历史</h4>
-                    <div id="cleanupHistory" class="history-list">
-                        <div class="no-history">暂无清理记录</div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeDataCleanupModal()">关闭</button>
-                <button id="saveCleanupConfigBtn" class="btn btn-primary">保存配置</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 确认清理所有数据的模态框 -->
-    <div id="confirmClearAllModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>⚠️ 确认操作</h3>
-                <span class="close" onclick="closeConfirmClearAllModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <p>您确定要清理所有数据吗？</p>
-                <p><strong>此操作将删除：</strong></p>
-                <ul>
-                    <li>所有Webhook日志</li>
-                    <li>所有统计信息</li>
-                    <li>所有告警信息</li>
-                    <li>所有请求计数</li>
-                </ul>
-                <p><strong>⚠️ 此操作不可恢复！</strong></p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeConfirmClearAllModal()">取消</button>
-                <button id="confirmClearAllBtn" class="btn btn-danger">确认清理</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 内存优化管理模态框 -->
-    <div id="memoryOptimizeModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>💾 内存优化管理</h3>
-                <span class="close" onclick="closeMemoryOptimizeModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="memory-overview">
-                    <h4>📊 内存概览</h4>
-                    <div class="memory-stats-grid">
-                        <div class="memory-stat-item">
-                            <span class="stat-label">堆内存使用:</span>
-                            <span class="stat-value" id="heapUsedValue">-- MB</span>
-                            <div class="memory-bar">
-                                <div class="memory-bar-fill" id="heapUsedBar"></div>
+                        <div class="ant-card-body">
+                            <div class="ant-form-item">
+                                <label class="ant-form-item-label">自动刷新间隔：</label>
+                                <div class="ant-form-item-control">
+                                    <select class="ant-select" id="refreshInterval">
+                                        <option value="0">不自动刷新</option>
+                                        <option value="5000">5秒</option>
+                                        <option value="10000" selected>10秒</option>
+                                        <option value="30000">30秒</option>
+                                        <option value="60000">1分钟</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <div class="memory-stat-item">
-                            <span class="stat-label">堆内存总量:</span>
-                            <span class="stat-value" id="heapTotalValue">-- MB</span>
-                        </div>
-                        <div class="memory-stat-item">
-                            <span class="stat-label">RSS内存:</span>
-                            <span class="stat-value" id="rssValue">-- MB</span>
-                        </div>
-                        <div class="memory-stat-item">
-                            <span class="stat-label">外部内存:</span>
-                            <span class="stat-value" id="externalValue">-- MB</span>
-                        </div>
-                    </div>
-                    <div class="memory-warnings" id="memoryWarnings"></div>
-                </div>
-
-                <div class="memory-chart">
-                    <h4>📈 内存使用趋势</h4>
-                    <canvas id="memoryChart" width="400" height="200"></canvas>
-                </div>
-
-                <div class="memory-config">
-                    <h4>⚙️ 优化配置</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableMemoryMonitor" checked> 启用内存监控
-                        </label>
-                        <small>实时监控内存使用情况</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="monitorInterval">监控间隔（秒）:</label>
-                            <input type="number" id="monitorInterval" value="30" min="10" max="300">
-                        </div>
-                        <div class="form-group">
-                            <label for="warningThreshold">警告阈值:</label>
-                            <input type="number" id="warningThreshold" value="0.7" min="0.1" max="1" step="0.1">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="criticalThreshold">紧急阈值:</label>
-                            <input type="number" id="criticalThreshold" value="0.9" min="0.1" max="1" step="0.1">
-                        </div>
-                        <div class="form-group">
-                            <label for="gcThreshold">垃圾回收阈值:</label>
-                            <input type="number" id="gcThreshold" value="0.8" min="0.1" max="1" step="0.1">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableLeakDetection" checked> 启用内存泄漏检测
-                        </label>
-                        <small>检测可能的内存泄漏问题</small>
-                    </div>
-                </div>
-
-                <div class="memory-actions">
-                    <h4>🔄 优化操作</h4>
-                    <div class="action-buttons">
-                        <button id="triggerGcBtn" class="btn btn-primary">🔄 触发垃圾回收</button>
-                        <button id="triggerMonitorBtn" class="btn btn-secondary">📊 触发监控</button>
-                        <button id="emergencyCleanupBtn" class="btn btn-danger">🚨 紧急清理</button>
-                        <button id="refreshMemoryBtn" class="btn btn-secondary">🔄 刷新状态</button>
-                    </div>
-                </div>
-
-                <div class="memory-history">
-                    <h4>📝 操作历史</h4>
-                    <div id="memoryHistory" class="history-list">
-                        <div class="no-history">暂无操作记录</div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeMemoryOptimizeModal()">关闭</button>
-                <button id="saveMemoryConfigBtn" class="btn btn-primary">保存配置</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 异步管理模态框 -->
-    <div id="asyncManageModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>⚡ 异步任务管理</h3>
-                <span class="close" onclick="closeAsyncManageModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="async-overview">
-                    <h4>📊 任务概览</h4>
-                    <div class="async-stats-grid">
-                        <div class="async-stat-item">
-                            <span class="stat-label">队列长度:</span>
-                            <span class="stat-value" id="queueLength">--</span>
-                        </div>
-                        <div class="async-stat-item">
-                            <span class="stat-label">活跃工作线程:</span>
-                            <span class="stat-value" id="activeWorkers">--</span>
-                        </div>
-                        <div class="async-stat-item">
-                            <span class="stat-label">总处理数:</span>
-                            <span class="stat-value" id="totalProcessed">--</span>
-                        </div>
-                        <div class="async-stat-item">
-                            <span class="stat-label">失败数:</span>
-                            <span class="stat-value" id="totalFailed">--</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="async-config">
-                    <h4>⚙️ 异步配置</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableAsync" checked> 启用异步处理
-                        </label>
-                        <small>使用异步队列处理Webhook请求</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="maxConcurrent">最大并发数:</label>
-                            <input type="number" id="maxConcurrent" value="10" min="1" max="50">
-                        </div>
-                        <div class="form-group">
-                            <label for="queueSize">队列大小:</label>
-                            <input type="number" id="queueSize" value="1000" min="100" max="10000">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="retryAttempts">重试次数:</label>
-                            <input type="number" id="retryAttempts" value="3" min="0" max="10">
-                        </div>
-                        <div class="form-group">
-                            <label for="retryDelay">重试延迟(ms):</label>
-                            <input type="number" id="retryDelay" value="1000" min="100" max="10000">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="async-actions">
-                    <h4>🔄 任务操作</h4>
-                    <div class="action-buttons">
-                        <button id="triggerAsyncTaskBtn" class="btn btn-primary">🚀 触发测试任务</button>
-                        <button id="clearQueueBtn" class="btn btn-danger">🗑️ 清空队列</button>
-                        <button id="refreshAsyncStatsBtn" class="btn btn-secondary">🔄 刷新状态</button>
-                    </div>
-                </div>
-
-                <div class="async-queue">
-                    <h4>📋 任务队列</h4>
-                    <div id="asyncQueueList" class="queue-list">
-                        <div class="no-queue">暂无任务</div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeAsyncManageModal()">关闭</button>
-                <button id="saveAsyncConfigBtn" class="btn btn-primary">保存配置</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 压缩管理模态框 -->
-    <div id="compressionManageModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>📦 数据压缩管理</h3>
-                <span class="close" onclick="closeCompressionManageModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="compression-overview">
-                    <h4>📊 压缩概览</h4>
-                    <div class="compression-stats-grid">
-                        <div class="compression-stat-item">
-                            <span class="stat-label">总请求数:</span>
-                            <span class="stat-value" id="totalRequests">--</span>
-                        </div>
-                        <div class="compression-stat-item">
-                            <span class="stat-label">压缩请求数:</span>
-                            <span class="stat-value" id="compressedRequests">--</span>
-                        </div>
-                        <div class="compression-stat-item">
-                            <span class="stat-label">节省空间:</span>
-                            <span class="stat-value" id="totalBytesSaved">-- MB</span>
-                        </div>
-                        <div class="compression-stat-item">
-                            <span class="stat-label">平均压缩率:</span>
-                            <span class="stat-value" id="averageCompressionRatio">--%</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="compression-config">
-                    <h4>⚙️ 压缩配置</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableCompression" checked> 启用数据压缩
-                        </label>
-                        <small>压缩请求和响应数据以节省带宽</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="compressionThreshold">压缩阈值(bytes):</label>
-                            <input type="number" id="compressionThreshold" value="1024" min="100" max="10000">
-                        </div>
-                        <div class="form-group">
-                            <label for="compressionLevel">压缩级别:</label>
-                            <input type="number" id="compressionLevel" value="6" min="0" max="9">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="windowBits">窗口大小:</label>
-                            <input type="number" id="windowBits" value="15" min="8" max="15">
-                        </div>
-                        <div class="form-group">
-                            <label for="memLevel">内存级别:</label>
-                            <input type="number" id="memLevel" value="8" min="1" max="9">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="compression-actions">
-                    <h4>🔄 压缩操作</h4>
-                    <div class="action-buttons">
-                        <button id="testCompressionBtn" class="btn btn-primary">🧪 测试压缩</button>
-                        <button id="resetCompressionStatsBtn" class="btn btn-danger">🔄 重置统计</button>
-                        <button id="refreshCompressionStatsBtn" class="btn btn-secondary">🔄 刷新状态</button>
-                    </div>
-                </div>
-
-                <div class="compression-test">
-                    <h4>🧪 压缩测试</h4>
-                    <div class="form-group">
-                        <label for="testData">测试数据:</label>
-                        <textarea id="testData" rows="4" placeholder="输入要测试压缩的数据..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="compressionEncoding">压缩算法:</label>
-                        <select id="compressionEncoding">
-                            <option value="gzip">Gzip</option>
-                            <option value="deflate">Deflate</option>
-                        </select>
-                    </div>
-                    <div id="compressionTestResult" class="test-result"></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeCompressionManageModal()">关闭</button>
-                <button id="saveCompressionConfigBtn" class="btn btn-primary">保存配置</button>
+            <div class="ant-modal-footer">
+                <button class="ant-btn ant-btn-default" id="resetDashboardConfig">重置默认</button>
+                <button class="ant-btn ant-btn-primary" id="saveDashboardConfig">保存配置</button>
+                <button class="ant-btn ant-btn-default" id="cancelDashboardConfig">取消</button>
             </div>
         </div>
     </div>
@@ -773,268 +564,5 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
     <script src="script.js"></script>
-    
-    <!-- 高级搜索模态框 -->
-    <div id="advancedSearchModal" class="modal">
-        <div class="modal-content advanced-search">
-            <div class="modal-header">
-                <h3>🔍 高级搜索</h3>
-                <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="search-section">
-                    <h4>搜索条件配置</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableRegexSearch"> 启用正则表达式搜索
-                        </label>
-                        <small>启用后可以使用正则表达式进行精确搜索</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="searchField">搜索字段：</label>
-                        <select id="searchField">
-                            <option value="all">所有字段</option>
-                            <option value="tenantId">Tenant ID</option>
-                            <option value="uniqueId">Unique ID</option>
-                            <option value="url">请求URL</option>
-                            <option value="method">请求方法</option>
-                            <option value="status">响应状态</option>
-                            <option value="ip">客户端IP</option>
-                            <option value="userAgent">User-Agent</option>
-                            <option value="body">请求体内容</option>
-                            <option value="headers">请求头</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="searchValue">搜索值：</label>
-                        <input type="text" id="searchValue" placeholder="输入搜索关键词或正则表达式">
-                        <small id="regexHelp" style="display: none;">正则表达式示例：^test.*$ 匹配以test开头的字符串</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="searchOperator">搜索操作符：</label>
-                        <select id="searchOperator">
-                            <option value="contains">包含</option>
-                            <option value="equals">等于</option>
-                            <option value="startsWith">开头是</option>
-                            <option value="endsWith">结尾是</option>
-                            <option value="regex">正则匹配</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="caseSensitive">
-                            <input type="checkbox" id="caseSensitive"> 区分大小写
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="search-section">
-                    <h4>多条件组合</h4>
-                    <div id="searchConditions">
-                        <!-- 搜索条件将在这里动态生成 -->
-                    </div>
-                    <button id="addSearchCondition" class="btn btn-small btn-secondary">+ 添加条件</button>
-                    <div class="form-group">
-                        <label for="conditionLogic">条件逻辑：</label>
-                        <select id="conditionLogic">
-                            <option value="AND">所有条件都满足 (AND)</option>
-                            <option value="OR">任一条件满足 (OR)</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="search-section">
-                    <h4>搜索历史</h4>
-                    <div id="searchHistory">
-                        <!-- 搜索历史将在这里显示 -->
-                    </div>
-                    <button id="clearSearchHistory" class="btn btn-small btn-warning">清空搜索历史</button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="saveSearchCondition" class="btn btn-info">保存搜索条件</button>
-                <button id="applyAdvancedSearch" class="btn btn-primary">应用搜索</button>
-                <button id="resetAdvancedSearch" class="btn btn-secondary">重置</button>
-                <button id="cancelAdvancedSearch" class="btn btn-secondary">取消</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 快速过滤模态框 -->
-    <div id="quickFilterModal" class="modal">
-        <div class="modal-content quick-filter">
-            <div class="modal-header">
-                <h3>⚡ 快速过滤</h3>
-                <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="quick-filter-section">
-                    <h4>常用过滤条件</h4>
-                    <div class="quick-filter-grid">
-                        <div class="quick-filter-item" data-filter="success">
-                            <div class="filter-icon">✅</div>
-                            <div class="filter-title">成功请求</div>
-                            <div class="filter-desc">状态码 200-299</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="error">
-                            <div class="filter-icon">❌</div>
-                            <div class="filter-title">错误请求</div>
-                            <div class="filter-desc">状态码 400-599</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="timeout">
-                            <div class="filter-icon">⏰</div>
-                            <div class="filter-title">超时请求</div>
-                            <div class="filter-desc">响应时间 > 5秒</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="recent">
-                            <div class="filter-icon">🕐</div>
-                            <div class="filter-title">最近1小时</div>
-                            <div class="filter-desc">最近1小时内的请求</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="mobile">
-                            <div class="filter-icon">📱</div>
-                            <div class="filter-title">移动端请求</div>
-                            <div class="filter-desc">User-Agent包含Mobile</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="bot">
-                            <div class="filter-icon">🤖</div>
-                            <div class="filter-title">机器人请求</div>
-                            <div class="filter-desc">User-Agent包含Bot</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="api">
-                            <div class="filter-icon">🔌</div>
-                            <div class="filter-title">API请求</div>
-                            <div class="filter-desc">Content-Type包含json</div>
-                        </div>
-                        <div class="quick-filter-item" data-filter="large">
-                            <div class="filter-icon">📦</div>
-                            <div class="filter-title">大文件请求</div>
-                            <div class="filter-desc">请求体 > 1MB</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="quick-filter-section">
-                    <h4>自定义快速过滤</h4>
-                    <div class="custom-filter-form">
-                        <div class="form-group">
-                            <label for="customFilterName">过滤名称：</label>
-                            <input type="text" id="customFilterName" placeholder="例如：重要客户请求">
-                        </div>
-                        <div class="form-group">
-                            <label for="customFilterCondition">过滤条件：</label>
-                            <textarea id="customFilterCondition" rows="3" placeholder="输入过滤条件，例如：tenantId = '123' AND status = 200"></textarea>
-                            <small>支持简单的条件表达式，使用 AND/OR 连接</small>
-                        </div>
-                        <button id="addCustomFilter" class="btn btn-small btn-primary">添加自定义过滤</button>
-                    </div>
-                </div>
-                
-                <div class="quick-filter-section">
-                    <h4>已保存的快速过滤</h4>
-                    <div id="savedQuickFilters">
-                        <!-- 已保存的快速过滤将在这里显示 -->
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="applyQuickFilter" class="btn btn-primary">应用过滤</button>
-                <button id="clearQuickFilter" class="btn btn-secondary">清除过滤</button>
-                <button id="cancelQuickFilter" class="btn btn-secondary">取消</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 安全配置模态框 -->
-    <div id="securityConfigModal" class="modal">
-        <div class="modal-content security-config">
-            <div class="modal-header">
-                <h3>🔒 安全配置</h3>
-                <span class="close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="security-section">
-                    <h4>IP白名单</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableIpWhitelist"> 启用IP白名单
-                        </label>
-                        <small>启用后，只有白名单中的IP地址才能访问webhook</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="ipWhitelist">白名单IP地址（每行一个）：</label>
-                        <textarea id="ipWhitelist" rows="5" placeholder="127.0.0.1&#10;192.168.1.100&#10;10.0.0.0/8"></textarea>
-                    </div>
-                </div>
-
-                <div class="security-section">
-                    <h4>速率限制</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableRateLimit" checked> 启用速率限制
-                        </label>
-                        <small>防止恶意请求和DDoS攻击</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="rateLimitWindow">时间窗口（分钟）：</label>
-                            <input type="number" id="rateLimitWindow" value="15" min="1" max="60">
-                        </div>
-                        <div class="form-group">
-                            <label for="rateLimitMax">最大请求数：</label>
-                            <input type="number" id="rateLimitMax" value="100" min="1" max="10000">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="security-section">
-                    <h4>请求验证</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableRequestValidation" checked> 启用请求验证
-                        </label>
-                        <small>验证请求格式和大小</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="maxRequestSize">最大请求大小（MB）：</label>
-                        <input type="number" id="maxRequestSize" value="10" min="1" max="100">
-                    </div>
-                </div>
-
-                <div class="security-section">
-                    <h4>请求签名</h4>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="enableSignature"> 启用请求签名验证
-                        </label>
-                        <small>使用HMAC验证请求的完整性</small>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="signatureSecret">密钥：</label>
-                            <input type="password" id="signatureSecret" placeholder="输入签名密钥">
-                        </div>
-                        <div class="form-group">
-                            <label for="signatureAlgorithm">算法：</label>
-                            <select id="signatureAlgorithm">
-                                <option value="sha256">SHA-256</option>
-                                <option value="sha1">SHA-1</option>
-                                <option value="md5">MD5</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="saveSecurityConfig" class="btn btn-primary">保存配置</button>
-                <button id="resetSecurityConfig" class="btn btn-secondary">重置默认</button>
-                <button id="cancelSecurityConfig" class="btn btn-secondary">取消</button>
-            </div>
-        </div>
-    </div>
-
 </body>
 </html>
