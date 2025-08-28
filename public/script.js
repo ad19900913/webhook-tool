@@ -19,13 +19,7 @@ let alerts = []; // 存储告警信息
 
 // 高级搜索相关变量
 let advancedSearchConditions = []; // 存储高级搜索条件
-let searchHistory = []; // 存储搜索历史
 let currentAdvancedSearch = null; // 当前应用的高级搜索
-
-// 快速过滤相关变量
-let quickFilters = []; // 存储快速过滤条件
-let savedQuickFilters = []; // 存储已保存的快速过滤
-let currentQuickFilter = null; // 当前应用的快速过滤
 
 // 图表对象
 let successRateChart = null;
@@ -45,7 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeSocket();
     loadWebhooks();
     bindEvents();
-    loadQuickFilters(); // 加载快速过滤配置
     initializeAdvancedSearch(); // 初始化高级搜索
     startMemoryMonitoring();
     
@@ -53,20 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         initSortable();
     }, 1000);
-    
-    // 绑定快捷键
-    bindShortcuts();
-    
-    // 绑定帮助快捷键
-    document.addEventListener('keydown', (e) => {
-        if (e.key === '?' && !e.ctrlKey && !e.altKey) {
-            e.preventDefault();
-            showShortcutHelp();
-        }
-    });
-    
-    // 启动操作引导
-    setTimeout(startTour, 2000);
 });
 
 // ==================== 高级搜索功能 ====================
@@ -76,9 +55,6 @@ function initializeAdvancedSearch() {
     // 重置搜索条件
     advancedSearchConditions = [];
     updateAdvancedSearchDisplay();
-    
-    // 加载搜索历史
-    loadSearchHistory();
 }
 
 // 添加搜索条件
@@ -342,53 +318,7 @@ function generateSearchName() {
     }
 }
 
-// 加载搜索历史
-function loadSearchHistory() {
-    const saved = localStorage.getItem('searchHistory');
-    if (saved) {
-        searchHistory = JSON.parse(saved);
-        updateSearchHistoryDisplay();
-    }
-}
 
-// 更新搜索历史显示
-function updateSearchHistoryDisplay() {
-    const container = document.getElementById('searchHistoryList');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    searchHistory.forEach(item => {
-        const div = document.createElement('div');
-        div.className = 'search-history-item';
-        div.innerHTML = `
-            <div class="search-name">${item.name}</div>
-            <div class="search-time">${new Date(item.timestamp).toLocaleString()}</div>
-            <div class="search-actions">
-                <button class="ant-btn ant-btn-sm" onclick="loadSearchFromHistory(${item.id})">应用</button>
-                <button class="ant-btn ant-btn-sm ant-btn-danger" onclick="removeFromSearchHistory(${item.id})">删除</button>
-            </div>
-        `;
-        container.appendChild(div);
-    });
-}
-
-// 从历史记录加载搜索
-function loadSearchFromHistory(id) {
-    const item = searchHistory.find(h => h.id === id);
-    if (item) {
-        advancedSearchConditions = JSON.parse(JSON.stringify(item.conditions));
-        updateAdvancedSearchDisplay();
-        showNotification('搜索条件已加载', 'success');
-    }
-}
-
-// 从历史记录删除搜索
-function removeFromSearchHistory(id) {
-    searchHistory = searchHistory.filter(h => h.id !== id);
-    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
-    updateSearchHistoryDisplay();
-}
 
 // 清空高级搜索
 function clearAdvancedSearch() {
@@ -402,100 +332,6 @@ function clearAdvancedSearch() {
     showNotification('高级搜索已清空', 'success');
 }
 
-// ==================== 快速过滤功能 ====================
-
-// 加载快速过滤配置
-function loadQuickFilters() {
-    const saved = localStorage.getItem('quickFilters');
-    if (saved) {
-        savedQuickFilters = JSON.parse(saved);
-        updateQuickFiltersDisplay();
-    }
-}
-
-// 保存快速过滤配置
-function saveQuickFilters() {
-    localStorage.setItem('quickFilters', JSON.stringify(savedQuickFilters));
-}
-
-// 更新快速过滤显示
-function updateQuickFiltersDisplay() {
-    const container = document.getElementById('quickFiltersContainer');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    savedQuickFilters.forEach(filter => {
-        const button = document.createElement('button');
-        button.className = `ant-btn ant-btn-sm ${currentQuickFilter && currentQuickFilter.id === filter.id ? 'ant-btn-primary' : 'ant-btn-default'}`;
-        button.innerHTML = `
-            <span>${filter.name}</span>
-            <span class="filter-close" onclick="event.stopPropagation(); removeQuickFilter(${filter.id})">×</span>
-        `;
-        button.onclick = () => applyQuickFilter(filter);
-        container.appendChild(button);
-    });
-}
-
-// 创建快速过滤
-function createQuickFilter() {
-    const name = prompt('请输入过滤器名称:');
-    if (!name) return;
-    
-    if (advancedSearchConditions.length === 0) {
-        showNotification('请先设置搜索条件', 'warning');
-        return;
-    }
-    
-    const filter = {
-        id: Date.now(),
-        name: name,
-        conditions: JSON.parse(JSON.stringify(advancedSearchConditions))
-    };
-    
-    savedQuickFilters.push(filter);
-    saveQuickFilters();
-    updateQuickFiltersDisplay();
-    
-    showNotification('快速过滤器已创建', 'success');
-}
-
-// 应用快速过滤
-function applyQuickFilter(filter) {
-    currentQuickFilter = filter;
-    advancedSearchConditions = JSON.parse(JSON.stringify(filter.conditions));
-    
-    // 执行搜索
-    const filteredLogs = allLogs.filter(log => {
-        return evaluateConditions(log, advancedSearchConditions);
-    });
-    
-    displayLogs(filteredLogs);
-    updateQuickFiltersDisplay();
-    
-    showNotification(`已应用快速过滤: ${filter.name}`, 'success');
-}
-
-// 移除快速过滤
-function removeQuickFilter(id) {
-    savedQuickFilters = savedQuickFilters.filter(f => f.id !== id);
-    
-    if (currentQuickFilter && currentQuickFilter.id === id) {
-        currentQuickFilter = null;
-        displayLogs(allLogs);
-    }
-    
-    saveQuickFilters();
-    updateQuickFiltersDisplay();
-}
-
-// 清除快速过滤
-function clearQuickFilter() {
-    currentQuickFilter = null;
-    updateQuickFiltersDisplay();
-    displayLogs(allLogs);
-    showNotification('快速过滤已清除', 'success');
-}
 
 // ==================== 核心功能 ====================
 
@@ -1460,187 +1296,8 @@ function initSortable() {
     }
 }
 
-// 快捷键支持
-const shortcuts = {
-    'ctrl+n': () => openWebhookModal(),
-    'ctrl+s': () => toggleStats(),
-    'ctrl+e': () => exportExcel(),
-    'escape': () => {
-        // 关闭所有模态框
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.style.display = 'none';
-        });
-    },
-    'ctrl+f': (e) => {
-        e.preventDefault();
-        const searchInput = document.getElementById('webhookSearch');
-        searchInput.focus();
-        searchInput.select();
-    },
-    'f5': (e) => {
-        e.preventDefault();
-        loadWebhooks();
-        loadLogs();
-        showNotification('数据已刷新', 'success');
-    }
-};
 
-// 绑定快捷键
-function bindShortcuts() {
-    document.addEventListener('keydown', (e) => {
-        const key = [];
-        if (e.ctrlKey) key.push('ctrl');
-        if (e.altKey) key.push('alt');
-        if (e.shiftKey) key.push('shift');
-        key.push(e.key.toLowerCase());
-        
-        const shortcut = key.join('+');
-        if (shortcuts[shortcut]) {
-            shortcuts[shortcut](e);
-        }
-    });
-}
 
-// 显示快捷键帮助
-function showShortcutHelp() {
-    const helpContent = `
-        <div class="shortcut-help">
-            <h4>快捷键说明</h4>
-            <div class="shortcut-list">
-                <div class="shortcut-item">
-                    <kbd>Ctrl + N</kbd>
-                    <span>创建新Webhook</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Ctrl + S</kbd>
-                    <span>打开/关闭统计图表</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Ctrl + E</kbd>
-                    <span>导出Excel</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Ctrl + F</kbd>
-                    <span>聚焦搜索框</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>F5</kbd>
-                    <span>刷新数据</span>
-                </div>
-                <div class="shortcut-item">
-                    <kbd>Esc</kbd>
-                    <span>关闭模态框</span>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    showNotification(helpContent, 'info', 8000);
-}
-
-// 操作引导功能
-let tourStep = 0;
-const tourSteps = [
-    {
-        element: '#createBtn2',
-        title: '创建Webhook',
-        content: '点击这里创建一个新的Webhook回调地址',
-        position: 'bottom'
-    },
-    {
-        element: '#webhookSearch',
-        title: '搜索功能',
-        content: '在这里输入关键词搜索Webhook',
-        position: 'bottom'
-    },
-    {
-        element: '#showStatsBtn',
-        title: '统计图表',
-        content: '查看详细的统计数据和图表分析',
-        position: 'bottom'
-    }
-];
-
-// 显示操作引导
-function startTour() {
-    if (localStorage.getItem('tourCompleted') === 'true') {
-        return;
-    }
-    
-    tourStep = 0;
-    showTourStep();
-}
-
-// 显示引导步骤
-function showTourStep() {
-    if (tourStep >= tourSteps.length) {
-        localStorage.setItem('tourCompleted', 'true');
-        return;
-    }
-    
-    const step = tourSteps[tourStep];
-    const element = document.querySelector(step.element);
-    
-    if (!element) {
-        tourStep++;
-        showTourStep();
-        return;
-    }
-    
-    const tour = document.createElement('div');
-    tour.className = 'tour-tooltip';
-    tour.innerHTML = `
-        <div class="tour-content">
-            <h4>${step.title}</h4>
-            <p>${step.content}</p>
-            <div class="tour-actions">
-                <button class="ant-btn ant-btn-sm" onclick="skipTour()">跳过</button>
-                <button class="ant-btn ant-btn-primary ant-btn-sm" onclick="nextTourStep()">
-                    ${tourStep === tourSteps.length - 1 ? '完成' : '下一步'}
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(tour);
-    
-    // 定位tooltip
-    const rect = element.getBoundingClientRect();
-    tour.style.position = 'fixed';
-    tour.style.left = rect.left + 'px';
-    tour.style.top = (rect.bottom + 10) + 'px';
-    tour.style.zIndex = '9999';
-    
-    // 高亮元素
-    element.classList.add('tour-highlight');
-}
-
-// 下一步引导
-function nextTourStep() {
-    // 移除当前高亮
-    document.querySelectorAll('.tour-highlight').forEach(el => {
-        el.classList.remove('tour-highlight');
-    });
-    
-    // 移除tooltip
-    document.querySelectorAll('.tour-tooltip').forEach(el => {
-        el.remove();
-    });
-    
-    tourStep++;
-    showTourStep();
-}
-
-// 跳过引导
-function skipTour() {
-    document.querySelectorAll('.tour-highlight').forEach(el => {
-        el.classList.remove('tour-highlight');
-    });
-    document.querySelectorAll('.tour-tooltip').forEach(el => {
-        el.remove();
-    });
-    localStorage.setItem('tourCompleted', 'true');
-}
 
 // 告警检查
 function checkAlerts(log) {
