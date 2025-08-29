@@ -36,7 +36,7 @@ const config = {
 // 中间件
 app.use(express.json({ limit: config.server?.maxBodySize || '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: config.server?.maxBodySize || '10mb' }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // 内存存储
 const webhooks = new Map(); // 存储webhook配置
@@ -61,6 +61,27 @@ let securityConfig = {
     algorithm: 'sha256'
   }
 };
+
+// 异步处理配置
+const asyncConfig = {
+  enabled: true,
+  maxConcurrent: 5, // 最大并发处理数
+  queueSize: 1000, // 队列最大长度
+  retryAttempts: 3, // 重试次数
+  retryDelay: 1000, // 重试延迟(ms)
+  timeout: 30000 // 任务超时时间(ms)
+};
+
+// 数据清理配置
+let cleanupConfig = {
+  enabled: true,
+  interval: 5 * 60 * 1000, // 5分钟清理一次
+  maxLogsPerWebhook: 1000, // 每个webhook最多保留1000条日志
+  maxLogAge: 24 * 60 * 60 * 1000, // 日志最大保留24小时
+  cleanupThreshold: 0.8 // 当内存使用率超过80%时触发清理
+};
+
+let cleanupTimer = null;
 
 // 请求计数器（用于速率限制）
 const requestCounts = new Map();
@@ -96,9 +117,119 @@ function clearAllData() {
   }
 }
 
+// 数据清理函数
+function cleanupExpiredData() {
+  console.log('🧹 开始执行数据清理...');
+  
+  const now = Date.now();
+  let totalCleaned = 0;
+  
+  try {
+    // 清理过期日志
+    webhookLogs.forEach((webhookData, webhookId) => {
+      if (!webhookData || !webhookData.all) return;
+      
+      const originalCount = webhookData.all.length;
+      
+      // 按时间清理
+      if (cleanupConfig.maxLogAge > 0) {
+        webhookData.all = webhookData.all.filter(log => {
+          const logTime = new Date(log.timestamp).getTime();
+          return (now - logTime) <= cleanupConfig.maxLogAge;
+        });
+      }
+      
+      // 按数量限制清理
+      if (webhookData.all.length > cleanupConfig.maxLogsPerWebhook) {
+        webhookData.all = webhookData.all.slice(0, cleanupConfig.maxLogsPerWebhook);
+      }
+      
+      // 重建类型索引
+      const newByType = {};
+      webhookData.all.forEach(log => {
+        const type = log.messageType || 'DEFAULT';
+        if (!newByType[type]) {
+          newByType[type] = [];
+        }
+        newByType[type].push(log);
+      });
+      
+      webhookData.byType = newByType;
+      webhookLogs.set(webhookId, webhookData);
+      
+      const cleanedCount = originalCount - webhookData.all.length;
+      totalCleaned += cleanedCount;
+      
+      if (cleanedCount > 0) {
+        console.log(`📝 Webhook ${webhookId}: 清理了 ${cleanedCount} 条日志`);
+      }
+    });
+    
+    // 清理过期的请求计数器
+    const fiveMinutesAgo = now - 5 * 60 * 1000;
+    requestCounts.forEach((requests, ip) => {
+      const validRequests = requests.filter(timestamp => timestamp > fiveMinutesAgo);
+      if (validRequests.length !== requests.length) {
+        requestCounts.set(ip, validRequests);
+      }
+      if (validRequests.length === 0) {
+        requestCounts.delete(ip);
+      }
+    });
+    
+    // 清理过期的统计信息
+    webhookStats.forEach((stats, webhookId) => {
+      const fifteenMinutesAgo = now - 15 * 60 * 1000;
+      const fiveMinutesAgo = now - 5 * 60 * 1000;
+      const oneMinuteAgo = now - 60 * 1000;
+      
+      if (stats.requestCounts) {
+        stats.requestCounts.last1Minute = stats.requestCounts.last1Minute?.filter(
+          item => item.timestamp >= oneMinuteAgo
+        ) || [];
+        stats.requestCounts.last5Minutes = stats.requestCounts.last5Minutes?.filter(
+          item => item.timestamp >= fiveMinutesAgo
+        ) || [];
+        stats.requestCounts.last15Minutes = stats.requestCounts.last15Minutes?.filter(
+          item => item.timestamp >= fifteenMinutesAgo
+        ) || [];
+      }
+      
+      if (stats.responseTimes) {
+        stats.responseTimes = stats.responseTimes.filter(
+          item => item.timestamp >= fifteenMinutesAgo
+        );
+      }
+      
+      webhookStats.set(webhookId, stats);
+    });
+    
+    console.log(`✅ 数据清理完成，共清理 ${totalCleaned} 条日志`);
+    
+    // 通知前端
+    io.emit('cleanup-completed', {
+      cleanedLogs: totalCleaned,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ 数据清理失败:', error);
+  }
+}
+
 // 启动定时清理任务
 function startCleanupTask() {
-
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+  }
+  
+  if (cleanupConfig.enabled) {
+    cleanupTimer = setInterval(() => {
+      cleanupExpiredData();
+    }, cleanupConfig.interval);
+    
+    console.log(`🕒 定时清理任务已启动，间隔: ${cleanupConfig.interval / 1000}秒`);
+  }
 }
 
 // 安全中间件
@@ -359,22 +490,11 @@ function checkAlerts(webhookId) {
 
 // 路由
 
-// 首页
+// 首页 - 服务React应用
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// 获取系统内存信息
-function getMemoryInfo() {
-  const memUsage = process.memoryUsage();
-  return {
-    rss: Math.round(memUsage.rss / 1024 / 1024 * 100) / 100, // MB
-    heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024 * 100) / 100, // MB
-    heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024 * 100) / 100, // MB
-    external: Math.round(memUsage.external / 1024 / 1024 * 100) / 100, // MB
-    timestamp: new Date().toISOString()
-  };
-}
 
 // 获取所有webhook
 app.get('/api/webhooks', (req, res) => {
@@ -399,15 +519,12 @@ app.get('/api/webhooks', (req, res) => {
   });
   
   res.json({
-    webhooks: webhookList,
-    memoryInfo: getMemoryInfo()
+    webhooks: webhookList
   });
 });
 
 // 获取系统状态API
 app.get('/api/system/status', (req, res) => {
-  const memInfo = getMemoryInfo();
-  
   // 计算总日志数量
   let totalLogs = 0;
   webhookLogs.forEach(webhookData => {
@@ -417,8 +534,7 @@ app.get('/api/system/status', (req, res) => {
   });
   
   res.json({
-    memory: memInfo,
-    totalLogs: totalLogs,
+    totalRequests: totalLogs,
     webhookCount: webhooks.size,
     uptime: Math.floor(process.uptime())
   });
@@ -870,6 +986,14 @@ const HOST = config.server?.host || process.env.HOST || '0.0.0.0';
 
 
 
+// 获取数据清理配置
+app.get('/api/cleanup/config', (req, res) => {
+  res.json({
+    success: true,
+    data: cleanupConfig
+  });
+});
+
 // 更新数据清理配置
 app.put('/api/cleanup/config', (req, res) => {
   const { enabled, interval, maxLogsPerWebhook, maxLogAge, cleanupThreshold } = req.body;
@@ -903,61 +1027,41 @@ app.post('/api/cleanup/trigger', (req, res) => {
   }
 });
 
-// 清理所有数据
-app.post('/api/cleanup/clear-all', (req, res) => {
-  try {
-    clearAllData();
-    res.json({
-      success: true,
-      message: '所有数据已清理完成'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
+// 获取异步队列状态
+app.get('/api/async/status', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      config: asyncConfig,
+      queue: {
+        length: asyncQueue.length,
+        activeWorkers: activeWorkers,
+        totalProcessed: totalProcessed,
+        totalFailed: totalFailed
+      }
+    }
+  });
 });
 
-// 获取数据统计信息
-app.get('/api/cleanup/stats', (req, res) => {
-  try {
-    const memUsage = process.memoryUsage();
-    const totalLogs = Array.from(webhookLogs.values()).reduce((total, data) => {
-      return total + (data.all ? data.all.length : 0);
-    }, 0);
-    
-    const totalAlerts = Array.from(webhookAlerts.values()).reduce((total, alerts) => {
-      return total + (Array.isArray(alerts) ? alerts.length : 0);
-    }, 0);
-    
-    const totalStats = webhookStats.size;
-    
-    res.json({
-      success: true,
-      data: {
-        memoryUsage: {
-          heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
-          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
-          external: Math.round(memUsage.external / 1024 / 1024),
-          rss: Math.round(memUsage.rss / 1024 / 1024)
-        },
-        dataCounts: {
-          totalLogs,
-          totalAlerts,
-          totalStats,
-          webhookCount: webhooks.size
-        },
-        cleanupConfig
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
+// 更新异步配置
+app.put('/api/async/config', (req, res) => {
+  const { enabled, maxConcurrent, queueSize, retryAttempts, retryDelay, timeout } = req.body;
+  
+  if (enabled !== undefined) asyncConfig.enabled = Boolean(enabled);
+  if (maxConcurrent !== undefined) asyncConfig.maxConcurrent = Number(maxConcurrent) || 5;
+  if (queueSize !== undefined) asyncConfig.queueSize = Number(queueSize) || 1000;
+  if (retryAttempts !== undefined) asyncConfig.retryAttempts = Number(retryAttempts) || 3;
+  if (retryDelay !== undefined) asyncConfig.retryDelay = Number(retryDelay) || 1000;
+  if (timeout !== undefined) asyncConfig.timeout = Number(timeout) || 30000;
+  
+  res.json({
+    success: true,
+    message: '异步配置已更新',
+    data: asyncConfig
+  });
 });
+
+
 
 
 
